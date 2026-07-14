@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
-import type { Propiedad, Proveedor, TipoProveedor } from '../api/types';
+import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION'] as const;
 
@@ -36,6 +36,13 @@ const PROVEEDOR_LABELS: Record<TipoProveedor, string> = {
   GAS: 'Gas',
 };
 
+const PROVEEDOR_FORM_INICIAL = {
+  tipo: 'AGUA' as TipoProveedor,
+  empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0],
+  nCliente: '',
+  estado: 'ACTIVO' as EstadoProveedor,
+};
+
 export function PropiedadesListPage() {
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,11 +54,8 @@ export function PropiedadesListPage() {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [proveedorForm, setProveedorForm] = useState({
-    tipo: 'AGUA' as TipoProveedor,
-    empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0],
-    nCliente: '',
-  });
+  const [proveedorForm, setProveedorForm] = useState(PROVEEDOR_FORM_INICIAL);
+  const [editingProveedorId, setEditingProveedorId] = useState<string | null>(null);
 
   const cargar = () => {
     setLoading(true);
@@ -164,21 +168,45 @@ export function PropiedadesListPage() {
       return;
     }
     setExpandedId(propiedadId);
-    setProveedorForm({ tipo: 'AGUA', empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0], nCliente: '' });
+    setEditingProveedorId(null);
+    setProveedorForm(PROVEEDOR_FORM_INICIAL);
     const lista = await api.get<Proveedor[]>(`/propiedades/${propiedadId}/proveedores`);
     setProveedores(lista);
   };
 
-  const handleAddProveedor = async (propiedadId: string) => {
+  const abrirEdicionProveedor = (proveedor: Proveedor) => {
+    setEditingProveedorId(proveedor.id);
+    setProveedorForm({
+      tipo: proveedor.tipo,
+      empresa: proveedor.empresa,
+      nCliente: proveedor.nCliente,
+      estado: proveedor.estado,
+    });
+  };
+
+  const cancelarEdicionProveedor = () => {
+    setEditingProveedorId(null);
+    setProveedorForm(PROVEEDOR_FORM_INICIAL);
+  };
+
+  const handleGuardarProveedor = async (propiedadId: string) => {
     if (!proveedorForm.nCliente.trim()) return;
-    await api.post(`/propiedades/${propiedadId}/proveedores`, proveedorForm);
-    setProveedorForm({ tipo: 'AGUA', empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0], nCliente: '' });
+
+    if (editingProveedorId) {
+      await api.patch(`/propiedades/${propiedadId}/proveedores/${editingProveedorId}`, proveedorForm);
+    } else {
+      await api.post(`/propiedades/${propiedadId}/proveedores`, proveedorForm);
+    }
+
+    setEditingProveedorId(null);
+    setProveedorForm(PROVEEDOR_FORM_INICIAL);
     const lista = await api.get<Proveedor[]>(`/propiedades/${propiedadId}/proveedores`);
     setProveedores(lista);
   };
 
   const handleDeleteProveedor = async (propiedadId: string, proveedorId: string) => {
     await api.delete(`/propiedades/${propiedadId}/proveedores/${proveedorId}`);
+    if (editingProveedorId === proveedorId) cancelarEdicionProveedor();
     setProveedores((prev) => prev.filter((p) => p.id !== proveedorId));
   };
 
@@ -471,13 +499,22 @@ export function PropiedadesListPage() {
                     <span className={`badge badge--${proveedor.estado.toLowerCase()}`}>
                       {proveedor.estado}
                     </span>
-                    <button
-                      type="button"
-                      className="danger danger--small"
-                      onClick={() => handleDeleteProveedor(propiedad.id, proveedor.id)}
-                    >
-                      Eliminar
-                    </button>
+                    <div className="proveedores-panel__row-actions">
+                      <button
+                        type="button"
+                        className="small"
+                        onClick={() => abrirEdicionProveedor(proveedor)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="danger danger--small"
+                        onClick={() => handleDeleteProveedor(propiedad.id, proveedor.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 ))}
 
@@ -514,9 +551,28 @@ export function PropiedadesListPage() {
                     value={proveedorForm.nCliente}
                     onChange={(e) => setProveedorForm({ ...proveedorForm, nCliente: e.target.value })}
                   />
-                  <button type="button" onClick={() => handleAddProveedor(propiedad.id)}>
-                    Agregar
+                  {editingProveedorId && (
+                    <select
+                      value={proveedorForm.estado}
+                      onChange={(e) =>
+                        setProveedorForm({
+                          ...proveedorForm,
+                          estado: e.target.value as EstadoProveedor,
+                        })
+                      }
+                    >
+                      <option value="ACTIVO">ACTIVO</option>
+                      <option value="INACTIVO">INACTIVO</option>
+                    </select>
+                  )}
+                  <button type="button" onClick={() => handleGuardarProveedor(propiedad.id)}>
+                    {editingProveedorId ? 'Guardar cambios' : 'Agregar'}
                   </button>
+                  {editingProveedorId && (
+                    <button type="button" onClick={cancelarEdicionProveedor}>
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </div>
             )}
