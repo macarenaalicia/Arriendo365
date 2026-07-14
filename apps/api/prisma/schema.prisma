@@ -27,6 +27,7 @@ enum EstadoPropiedad {
   DISPONIBLE
   ARRENDADA
   EN_MANTENCION
+  USUFRUCTO
 }
 
 enum TipoProveedor {

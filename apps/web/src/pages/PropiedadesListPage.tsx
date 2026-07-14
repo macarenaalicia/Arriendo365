@@ -4,7 +4,7 @@ import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
-const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION'] as const;
+const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION', 'USUFRUCTO'] as const;
 
 type CampoOrdenable =
   | 'rol'
