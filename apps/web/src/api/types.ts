@@ -4,6 +4,12 @@ export type EstadoArriendo = 'ACTIVO' | 'INACTIVO' | 'TERMINADO';
 
 export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ATRASADO' | 'RECHAZADO';
 
+export type TipoPropiedad = 'CASA' | 'DEPARTAMENTO' | 'HABITACION';
+
+export type EstadoPropiedad = 'DISPONIBLE' | 'ARRENDADA' | 'EN_MANTENCION';
+
+export type EstadoAuto = 'DISPONIBLE' | 'ARRENDADO' | 'EN_MANTENCION';
+
 export interface Propiedad {
   id: string;
   rol: string;
@@ -12,10 +18,26 @@ export interface Propiedad {
   sector: string | null;
   ciudad: string;
   region: string;
-  tipo: string;
+  tipo: TipoPropiedad;
   nHabitaciones: number;
   nBanos: number;
-  estado: string;
+  bodega: boolean;
+  bodegaNumero: string | null;
+  estacionamiento: boolean;
+  estacionamientoNumero: string | null;
+  mt2Totales: string;
+  mt2Construidos: string;
+  descripcion: string | null;
+  estado: EstadoPropiedad;
+  pagaContribuciones: boolean;
+}
+
+export interface Auto {
+  id: string;
+  patente: string;
+  kilometraje: number;
+  padronDocId: string | null;
+  estado: EstadoAuto;
 }
 
 export interface Persona {

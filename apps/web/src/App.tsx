@@ -7,6 +7,8 @@ import { RegistroPage } from './pages/RegistroPage';
 import { ArriendosListPage } from './pages/ArriendosListPage';
 import { ArriendoDetailPage } from './pages/ArriendoDetailPage';
 import { PagosResumenPage } from './pages/PagosResumenPage';
+import { PropiedadesListPage } from './pages/PropiedadesListPage';
+import { AutosListPage } from './pages/AutosListPage';
 
 function App() {
   return (
@@ -21,6 +23,8 @@ function App() {
               <Route path="/" element={<ArriendosListPage />} />
               <Route path="/arriendos/:id" element={<ArriendoDetailPage />} />
               <Route path="/pagos" element={<PagosResumenPage />} />
+              <Route path="/propiedades" element={<PropiedadesListPage />} />
+              <Route path="/autos" element={<AutosListPage />} />
             </Route>
           </Route>
 

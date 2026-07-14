@@ -201,6 +201,10 @@ button {
   border-color: var(--color-primary);
 }
 
+.card--static:hover {
+  border-color: var(--color-border);
+}
+
 .card__title {
   font-weight: 600;
 }
@@ -216,6 +220,92 @@ button {
   align-items: center;
   gap: 0.75rem;
   font-size: 0.9rem;
+}
+
+/* Inline create forms */
+.inline-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.inline-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.8rem;
+}
+
+.inline-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.inline-form input,
+.inline-form select,
+.inline-form textarea {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 400;
+  font-family: inherit;
+}
+
+.inline-form textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.inline-form__checks {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.4rem !important;
+}
+
+.checkbox input {
+  width: auto;
+}
+
+.inline-form button {
+  align-self: flex-start;
+  padding: 0.55rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+}
+
+.inline-form button:hover {
+  background: var(--color-primary-dark);
+}
+
+.page-header button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.page-header button:hover {
+  background: var(--color-primary-dark);
 }
 
 /* Badges */

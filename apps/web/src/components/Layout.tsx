@@ -18,6 +18,8 @@ export function Layout() {
           <NavLink to="/" end>
             Arriendos
           </NavLink>
+          <NavLink to="/propiedades">Propiedades</NavLink>
+          <NavLink to="/autos">Autos</NavLink>
           <NavLink to="/pagos">Pagos</NavLink>
         </nav>
         <button type="button" onClick={handleLogout} className="layout__logout">
