@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import type { Auto, EstadoAuto } from '../api/types';
+import { formatEnumLabel } from '../lib/format';
 
 const ESTADOS: EstadoAuto[] = ['DISPONIBLE', 'ARRENDADO', 'EN_MANTENCION'];
 
@@ -115,7 +116,7 @@ export function AutosListPage() {
                 >
                   {ESTADOS.map((estado) => (
                     <option key={estado} value={estado}>
-                      {estado}
+                      {formatEnumLabel(estado)}
                     </option>
                   ))}
                 </select>
@@ -153,7 +154,7 @@ export function AutosListPage() {
                   <td>{auto.kilometraje.toLocaleString('es-CL')} km</td>
                   <td>
                     <span className={`badge badge--${auto.estado.toLowerCase()}`}>
-                      {auto.estado}
+                      {formatEnumLabel(auto.estado)}
                     </span>
                   </td>
                   <td>

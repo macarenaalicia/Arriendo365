@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
+import { formatEnumLabel } from '../lib/format';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
 const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION', 'USUFRUCTO'] as const;
@@ -646,7 +647,7 @@ export function PropiedadesListPage() {
                       >
                         {ESTADOS_PROPIEDAD.map((estado) => (
                           <option key={estado} value={estado}>
-                            {estado}
+                            {formatEnumLabel(estado)}
                           </option>
                         ))}
                       </select>
