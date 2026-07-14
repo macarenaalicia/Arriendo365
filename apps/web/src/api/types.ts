@@ -74,14 +74,19 @@ export interface ConfiguracionMantencion {
   cadaKm: number;
 }
 
+export interface MantencionAutoItem {
+  id: string;
+  configuracionId: string;
+  configuracion: ConfiguracionMantencion;
+}
+
 export interface MantencionAuto {
   id: string;
   autoId: string;
-  configuracionId: string;
   kilometrajeActual: number;
   kilometrajeProxima: number | null;
   fechaMantencion: string;
-  configuracion: ConfiguracionMantencion;
+  items: MantencionAutoItem[];
 }
 
 export interface ArriendoAuto {

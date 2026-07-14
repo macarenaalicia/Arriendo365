@@ -4,6 +4,10 @@ import { TenantContextService } from '../../common/tenant/tenant-context.service
 import { CreateMantencionAutoDto } from './dto/create-mantencion-auto.dto';
 import { UpdateMantencionAutoDto } from './dto/update-mantencion-auto.dto';
 
+const DETALLE_INCLUDE = {
+  items: { include: { configuracion: true } },
+} as const;
+
 @Injectable()
 export class MantencionAutoService {
   constructor(
@@ -20,22 +24,28 @@ export class MantencionAutoService {
     }
   }
 
-  private async assertConfiguracionExiste(configuracionId: string) {
-    const configuracion = await this.prisma.configuracionMantencion.findUnique({
-      where: { id: configuracionId },
+  private async assertConfiguracionesExisten(configuracionIds: string[]) {
+    const cantidad = await this.prisma.configuracionMantencion.count({
+      where: { id: { in: configuracionIds } },
     });
-    if (!configuracion) {
-      throw new NotFoundException('Configuración de mantención no encontrada');
+    if (cantidad !== configuracionIds.length) {
+      throw new NotFoundException('Alguna configuración de mantención no fue encontrada');
     }
   }
 
   async create(autoId: string, dto: CreateMantencionAutoDto) {
     await this.assertAutoEnOrganizacion(autoId);
-    await this.assertConfiguracionExiste(dto.configuracionId);
+    await this.assertConfiguracionesExisten(dto.configuracionIds);
 
     return this.prisma.mantencionAuto.create({
-      data: { ...dto, autoId },
-      include: { configuracion: true },
+      data: {
+        autoId,
+        kilometrajeActual: dto.kilometrajeActual,
+        kilometrajeProxima: dto.kilometrajeProxima,
+        fechaMantencion: dto.fechaMantencion,
+        items: { create: dto.configuracionIds.map((configuracionId) => ({ configuracionId })) },
+      },
+      include: DETALLE_INCLUDE,
     });
   }
 
@@ -44,7 +54,7 @@ export class MantencionAutoService {
 
     return this.prisma.mantencionAuto.findMany({
       where: { autoId },
-      include: { configuracion: true },
+      include: DETALLE_INCLUDE,
       orderBy: { fechaMantencion: 'desc' },
     });
   }
@@ -54,7 +64,7 @@ export class MantencionAutoService {
 
     const mantencion = await this.prisma.mantencionAuto.findFirst({
       where: { id, autoId },
-      include: { configuracion: true },
+      include: DETALLE_INCLUDE,
     });
     if (!mantencion) {
       throw new NotFoundException('Mantención no encontrada');
@@ -65,14 +75,27 @@ export class MantencionAutoService {
 
   async update(autoId: string, id: string, dto: UpdateMantencionAutoDto) {
     await this.findOne(autoId, id);
-    if (dto.configuracionId) {
-      await this.assertConfiguracionExiste(dto.configuracionId);
+    if (dto.configuracionIds) {
+      await this.assertConfiguracionesExisten(dto.configuracionIds);
     }
 
-    return this.prisma.mantencionAuto.update({
-      where: { id },
-      data: dto,
-      include: { configuracion: true },
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.configuracionIds) {
+        await tx.mantencionAutoItem.deleteMany({ where: { mantencionAutoId: id } });
+      }
+
+      return tx.mantencionAuto.update({
+        where: { id },
+        data: {
+          kilometrajeActual: dto.kilometrajeActual,
+          kilometrajeProxima: dto.kilometrajeProxima,
+          fechaMantencion: dto.fechaMantencion,
+          items: dto.configuracionIds
+            ? { create: dto.configuracionIds.map((configuracionId) => ({ configuracionId })) }
+            : undefined,
+        },
+        include: DETALLE_INCLUDE,
+      });
     });
   }
 

@@ -387,6 +387,14 @@ button {
   width: auto;
 }
 
+.tipo-mantencion-checks {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
 .inline-form button {
   align-self: flex-start;
   padding: 0.55rem 1.2rem;

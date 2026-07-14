@@ -17,7 +17,7 @@ const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
 const FORM_INICIAL = { patente: '', kilometraje: '' };
 
 const MANTENCION_FORM_INICIAL = {
-  configuracionId: '',
+  configuracionIds: [] as string[],
   kilometrajeActual: '',
   kilometrajeProxima: '',
   fechaMantencion: '',
@@ -153,11 +153,20 @@ export function AutosListPage() {
     setEditingMantencionId(mantencion.id);
     setMantencionError(null);
     setMantencionForm({
-      configuracionId: mantencion.configuracionId,
+      configuracionIds: mantencion.items.map((item) => item.configuracionId),
       kilometrajeActual: String(mantencion.kilometrajeActual),
       kilometrajeProxima: mantencion.kilometrajeProxima ? String(mantencion.kilometrajeProxima) : '',
       fechaMantencion: mantencion.fechaMantencion.slice(0, 10),
     });
+  };
+
+  const toggleTipoMantencion = (configuracionId: string) => {
+    setMantencionForm((prev) => ({
+      ...prev,
+      configuracionIds: prev.configuracionIds.includes(configuracionId)
+        ? prev.configuracionIds.filter((id) => id !== configuracionId)
+        : [...prev.configuracionIds, configuracionId],
+    }));
   };
 
   const cancelarEdicionMantencion = () => {
@@ -174,20 +183,24 @@ export function AutosListPage() {
     });
     const lista = await api.get<ConfiguracionMantencion[]>('/configuraciones-mantencion');
     setConfiguraciones(lista);
-    setMantencionForm({ ...mantencionForm, configuracionId: nueva.id });
+    setMantencionForm({ ...mantencionForm, configuracionIds: [...mantencionForm.configuracionIds, nueva.id] });
     setNuevaConfigForm(NUEVA_CONFIG_INICIAL);
     setShowNuevaConfig(false);
   };
 
   const handleGuardarMantencion = async (autoId: string) => {
-    if (!mantencionForm.configuracionId || !mantencionForm.kilometrajeActual || !mantencionForm.fechaMantencion) {
-      setMantencionError('Elige el tipo de mantención, el km actual y la fecha.');
+    if (
+      mantencionForm.configuracionIds.length === 0 ||
+      !mantencionForm.kilometrajeActual ||
+      !mantencionForm.fechaMantencion
+    ) {
+      setMantencionError('Elige al menos un tipo de mantención, el km actual y la fecha.');
       return;
     }
     setMantencionError(null);
 
     const payload = {
-      configuracionId: mantencionForm.configuracionId,
+      configuracionIds: mantencionForm.configuracionIds,
       kilometrajeActual: Number(mantencionForm.kilometrajeActual),
       kilometrajeProxima: mantencionForm.kilometrajeProxima
         ? Number(mantencionForm.kilometrajeProxima)
@@ -204,7 +217,7 @@ export function AutosListPage() {
     setEditingMantencionId(null);
     setMantencionForm({
       ...MANTENCION_FORM_INICIAL,
-      configuracionId: mantencionForm.configuracionId,
+      configuracionIds: mantencionForm.configuracionIds,
     });
     const lista = await api.get<MantencionAuto[]>(`/autos/${autoId}/mantenciones`);
     setMantenciones(lista);
@@ -391,8 +404,9 @@ export function AutosListPage() {
                           {mantencionError && <p className="auth-card__error">{mantencionError}</p>}
                           {mantenciones.map((m) => (
                             <div key={m.id} className="proveedores-panel__row">
-                              <span className="proveedores-panel__tipo">{m.configuracion.tipo}</span>
-                              <span>cada {m.configuracion.cadaKm.toLocaleString('es-CL')} km</span>
+                              <span className="proveedores-panel__tipo">
+                                {m.items.map((item) => item.configuracion.tipo).join(', ')}
+                              </span>
                               <span>{m.kilometrajeActual.toLocaleString('es-CL')} km actual</span>
                               <span>
                                 {m.kilometrajeProxima
@@ -415,23 +429,23 @@ export function AutosListPage() {
                             </div>
                           ))}
 
-                          <div className="proveedores-panel__add">
-                            <select
-                              value={mantencionForm.configuracionId}
-                              onChange={(e) =>
-                                setMantencionForm({ ...mantencionForm, configuracionId: e.target.value })
-                              }
-                            >
-                              <option value="">Tipo de mantención…</option>
-                              {configuraciones.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.tipo} (cada {c.cadaKm.toLocaleString('es-CL')} km)
-                                </option>
-                              ))}
-                            </select>
+                          <div className="tipo-mantencion-checks">
+                            {configuraciones.map((c) => (
+                              <label key={c.id} className="checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={mantencionForm.configuracionIds.includes(c.id)}
+                                  onChange={() => toggleTipoMantencion(c.id)}
+                                />
+                                {c.tipo}
+                              </label>
+                            ))}
                             <button type="button" onClick={() => setShowNuevaConfig((v) => !v)}>
                               {showNuevaConfig ? 'Cancelar' : '+ Nuevo tipo'}
                             </button>
+                          </div>
+
+                          <div className="proveedores-panel__add">
                             <input
                               type="number"
                               placeholder="Km actual"

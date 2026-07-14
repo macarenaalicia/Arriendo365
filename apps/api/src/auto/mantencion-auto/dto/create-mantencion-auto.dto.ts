@@ -1,9 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { ArrayMinSize, IsArray, IsDate, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreateMantencionAutoDto {
-  @IsUUID()
-  configuracionId: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID(undefined, { each: true })
+  configuracionIds: string[];
 
   @IsInt()
   @Min(0)

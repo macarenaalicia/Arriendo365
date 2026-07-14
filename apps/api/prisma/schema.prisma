@@ -420,22 +420,34 @@ model ConfiguracionMantencion {
   tipo   String
   cadaKm Int
 
-  mantenciones MantencionAuto[]
+  items MantencionAutoItem[]
 
   @@map("configuracion_mantencion")
 }
 
 model MantencionAuto {
-  id                 String                  @id @default(uuid())
+  id                 String   @id @default(uuid())
   autoId             String
-  auto               Auto                    @relation(fields: [autoId], references: [id])
-  configuracionId    String
-  configuracion      ConfiguracionMantencion @relation(fields: [configuracionId], references: [id])
+  auto               Auto     @relation(fields: [autoId], references: [id])
   kilometrajeActual  Int
   kilometrajeProxima Int?
   fechaMantencion    DateTime
 
+  items MantencionAutoItem[]
+
   @@map("mantencion_auto")
+}
+
+// Una visita de mantención puede cubrir varios tipos a la vez
+// (ej. cambio de aceite + filtro de aire en la misma visita).
+model MantencionAutoItem {
+  id               String                  @id @default(uuid())
+  mantencionAutoId String
+  mantencionAuto   MantencionAuto          @relation(fields: [mantencionAutoId], references: [id], onDelete: Cascade)
+  configuracionId  String
+  configuracion    ConfiguracionMantencion @relation(fields: [configuracionId], references: [id])
+
+  @@map("mantencion_auto_item")
 }
 
 model ArriendoAuto {
