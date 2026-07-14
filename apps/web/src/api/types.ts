@@ -16,7 +16,7 @@ export type EstadoProveedor = 'ACTIVO' | 'INACTIVO';
 
 export const EMPRESAS_POR_TIPO_PROVEEDOR: Record<TipoProveedor, string[]> = {
   LUZ: ['Chilquinta Energía', 'CGE'],
-  AGUA: ['Esval'],
+  AGUA: ['Esval', 'APR (Agua Potable Rural)'],
   GAS: ['GasValpo', 'Gasco', 'Abastible', 'Lipigas'],
 };
 
