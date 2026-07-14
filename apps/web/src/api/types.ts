@@ -14,6 +14,12 @@ export type TipoProveedor = 'AGUA' | 'LUZ' | 'GAS';
 
 export type EstadoProveedor = 'ACTIVO' | 'INACTIVO';
 
+export const EMPRESAS_POR_TIPO_PROVEEDOR: Record<TipoProveedor, string[]> = {
+  LUZ: ['Chilquinta Energía', 'CGE'],
+  AGUA: ['Esval'],
+  GAS: ['GasValpo', 'Gasco', 'Abastible', 'Lipigas'],
+};
+
 export interface Propiedad {
   id: string;
   rol: string;
@@ -41,6 +47,7 @@ export interface Proveedor {
   id: string;
   propiedadId: string;
   tipo: TipoProveedor;
+  empresa: string;
   nCliente: string;
   estado: EstadoProveedor;
 }

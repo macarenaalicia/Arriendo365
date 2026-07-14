@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
+import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { Propiedad, Proveedor, TipoProveedor } from '../api/types';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION'] as const;
@@ -21,8 +22,11 @@ const FORM_INICIAL = {
   estacionamiento: false,
   pagaContribuciones: false,
   descripcion: '',
+  aguaEmpresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0],
   aguaCliente: '',
+  luzEmpresa: EMPRESAS_POR_TIPO_PROVEEDOR.LUZ[0],
   luzCliente: '',
+  gasEmpresa: EMPRESAS_POR_TIPO_PROVEEDOR.GAS[0],
   gasCliente: '',
 };
 
@@ -43,7 +47,11 @@ export function PropiedadesListPage() {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [proveedorForm, setProveedorForm] = useState({ tipo: 'AGUA' as TipoProveedor, nCliente: '' });
+  const [proveedorForm, setProveedorForm] = useState({
+    tipo: 'AGUA' as TipoProveedor,
+    empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0],
+    nCliente: '',
+  });
 
   const cargar = () => {
     setLoading(true);
@@ -122,10 +130,10 @@ export function PropiedadesListPage() {
       } else {
         const creada = await api.post<Propiedad>('/propiedades', payload);
 
-        const candidatos: Array<{ tipo: TipoProveedor; nCliente: string }> = [
-          { tipo: 'AGUA', nCliente: form.aguaCliente },
-          { tipo: 'LUZ', nCliente: form.luzCliente },
-          { tipo: 'GAS', nCliente: form.gasCliente },
+        const candidatos: Array<{ tipo: TipoProveedor; empresa: string; nCliente: string }> = [
+          { tipo: 'AGUA', empresa: form.aguaEmpresa, nCliente: form.aguaCliente },
+          { tipo: 'LUZ', empresa: form.luzEmpresa, nCliente: form.luzCliente },
+          { tipo: 'GAS', empresa: form.gasEmpresa, nCliente: form.gasCliente },
         ];
         const proveedoresIniciales = candidatos.filter((p) => p.nCliente.trim() !== '');
 
@@ -156,7 +164,7 @@ export function PropiedadesListPage() {
       return;
     }
     setExpandedId(propiedadId);
-    setProveedorForm({ tipo: 'AGUA', nCliente: '' });
+    setProveedorForm({ tipo: 'AGUA', empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0], nCliente: '' });
     const lista = await api.get<Proveedor[]>(`/propiedades/${propiedadId}/proveedores`);
     setProveedores(lista);
   };
@@ -164,7 +172,7 @@ export function PropiedadesListPage() {
   const handleAddProveedor = async (propiedadId: string) => {
     if (!proveedorForm.nCliente.trim()) return;
     await api.post(`/propiedades/${propiedadId}/proveedores`, proveedorForm);
-    setProveedorForm({ tipo: 'AGUA', nCliente: '' });
+    setProveedorForm({ tipo: 'AGUA', empresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0], nCliente: '' });
     const lista = await api.get<Proveedor[]>(`/propiedades/${propiedadId}/proveedores`);
     setProveedores(lista);
   };
@@ -339,6 +347,19 @@ export function PropiedadesListPage() {
               <legend>Cuentas de proveedores (opcional)</legend>
               <div className="inline-form__grid">
                 <label>
+                  Empresa agua
+                  <select
+                    value={form.aguaEmpresa}
+                    onChange={(e) => setForm({ ...form, aguaEmpresa: e.target.value })}
+                  >
+                    {EMPRESAS_POR_TIPO_PROVEEDOR.AGUA.map((empresa) => (
+                      <option key={empresa} value={empresa}>
+                        {empresa}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   N° cliente agua
                   <input
                     value={form.aguaCliente}
@@ -346,11 +367,37 @@ export function PropiedadesListPage() {
                   />
                 </label>
                 <label>
+                  Empresa luz
+                  <select
+                    value={form.luzEmpresa}
+                    onChange={(e) => setForm({ ...form, luzEmpresa: e.target.value })}
+                  >
+                    {EMPRESAS_POR_TIPO_PROVEEDOR.LUZ.map((empresa) => (
+                      <option key={empresa} value={empresa}>
+                        {empresa}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   N° cliente luz
                   <input
                     value={form.luzCliente}
                     onChange={(e) => setForm({ ...form, luzCliente: e.target.value })}
                   />
+                </label>
+                <label>
+                  Empresa gas
+                  <select
+                    value={form.gasEmpresa}
+                    onChange={(e) => setForm({ ...form, gasEmpresa: e.target.value })}
+                  >
+                    {EMPRESAS_POR_TIPO_PROVEEDOR.GAS.map((empresa) => (
+                      <option key={empresa} value={empresa}>
+                        {empresa}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   N° cliente gas
@@ -419,6 +466,7 @@ export function PropiedadesListPage() {
                     <span className="proveedores-panel__tipo">
                       {PROVEEDOR_LABELS[proveedor.tipo]}
                     </span>
+                    <span>{proveedor.empresa}</span>
                     <span>{proveedor.nCliente}</span>
                     <span className={`badge badge--${proveedor.estado.toLowerCase()}`}>
                       {proveedor.estado}
@@ -436,13 +484,28 @@ export function PropiedadesListPage() {
                 <div className="proveedores-panel__add">
                   <select
                     value={proveedorForm.tipo}
-                    onChange={(e) =>
-                      setProveedorForm({ ...proveedorForm, tipo: e.target.value as TipoProveedor })
-                    }
+                    onChange={(e) => {
+                      const tipo = e.target.value as TipoProveedor;
+                      setProveedorForm({
+                        ...proveedorForm,
+                        tipo,
+                        empresa: EMPRESAS_POR_TIPO_PROVEEDOR[tipo][0],
+                      });
+                    }}
                   >
                     {(Object.keys(PROVEEDOR_LABELS) as TipoProveedor[]).map((tipo) => (
                       <option key={tipo} value={tipo}>
                         {PROVEEDOR_LABELS[tipo]}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={proveedorForm.empresa}
+                    onChange={(e) => setProveedorForm({ ...proveedorForm, empresa: e.target.value })}
+                  >
+                    {EMPRESAS_POR_TIPO_PROVEEDOR[proveedorForm.tipo].map((empresa) => (
+                      <option key={empresa} value={empresa}>
+                        {empresa}
                       </option>
                     ))}
                   </select>

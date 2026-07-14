@@ -260,6 +260,7 @@ model Proveedor {
   propiedadId String
   propiedad   Propiedad       @relation(fields: [propiedadId], references: [id])
   tipo        TipoProveedor
+  empresa     String          @default("")
   nCliente    String
   estado      EstadoProveedor @default(ACTIVO)
 

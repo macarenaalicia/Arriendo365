@@ -6,6 +6,9 @@ export class CreateProveedorDto {
   tipo: TipoProveedor;
 
   @IsString()
+  empresa: string;
+
+  @IsString()
   nCliente: string;
 
   @IsOptional()
