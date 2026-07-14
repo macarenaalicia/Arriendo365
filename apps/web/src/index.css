@@ -559,6 +559,53 @@ button {
   background: #fee2e2;
 }
 
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-sortable:hover {
+  color: var(--color-primary);
+}
+
+.th-sortable__arrow {
+  color: var(--color-primary);
+  font-size: 0.7rem;
+}
+
+.cell-editable {
+  cursor: text;
+}
+
+.cell-editable:hover {
+  background: var(--color-bg);
+}
+
+.cell-input {
+  width: 100%;
+  min-width: 60px;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.cell-select {
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cell-select:hover {
+  border-color: var(--color-border);
+}
+
 /* Resumen de pagos */
 .stat-grid {
   display: grid;

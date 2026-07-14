@@ -1,9 +1,22 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
+const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION'] as const;
+
+type CampoOrdenable =
+  | 'rol'
+  | 'direccion'
+  | 'ubicacion'
+  | 'tipo'
+  | 'nHabitaciones'
+  | 'nBanos'
+  | 'mt2Totales'
+  | 'estado';
+
+type CampoCelda = 'rol' | 'nHabitaciones' | 'nBanos' | 'mt2Totales';
 
 const FORM_INICIAL = {
   rol: '',
@@ -56,6 +69,82 @@ export function PropiedadesListPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedorForm, setProveedorForm] = useState(PROVEEDOR_FORM_INICIAL);
   const [editingProveedorId, setEditingProveedorId] = useState<string | null>(null);
+
+  const [sortField, setSortField] = useState<CampoOrdenable | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const [editingCell, setEditingCell] = useState<{ id: string; campo: CampoCelda } | null>(null);
+  const [cellValue, setCellValue] = useState('');
+
+  const toggleSort = (campo: CampoOrdenable) => {
+    if (sortField === campo) {
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(campo);
+      setSortDir('asc');
+    }
+  };
+
+  const valorOrdenable = (propiedad: Propiedad, campo: CampoOrdenable): string | number => {
+    switch (campo) {
+      case 'rol':
+        return propiedad.rol;
+      case 'direccion':
+        return `${propiedad.calle} ${propiedad.numero}`;
+      case 'ubicacion':
+        return `${propiedad.ciudad} ${propiedad.region}`;
+      case 'tipo':
+        return propiedad.tipo;
+      case 'nHabitaciones':
+        return propiedad.nHabitaciones;
+      case 'nBanos':
+        return propiedad.nBanos;
+      case 'mt2Totales':
+        return Number(propiedad.mt2Totales);
+      case 'estado':
+        return propiedad.estado;
+    }
+  };
+
+  const propiedadesOrdenadas = useMemo(() => {
+    if (!sortField) return propiedades;
+    const copia = [...propiedades];
+    copia.sort((a, b) => {
+      const va = valorOrdenable(a, sortField);
+      const vb = valorOrdenable(b, sortField);
+      const cmp =
+        typeof va === 'number' && typeof vb === 'number'
+          ? va - vb
+          : String(va).localeCompare(String(vb), 'es');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return copia;
+  }, [propiedades, sortField, sortDir]);
+
+  const guardarCampo = async (id: string, campo: string, valor: unknown) => {
+    await api.patch(`/propiedades/${id}`, { [campo]: valor });
+    cargar();
+  };
+
+  const startEditCell = (propiedad: Propiedad, campo: CampoCelda) => {
+    setEditingCell({ id: propiedad.id, campo });
+    setCellValue(String(propiedad[campo]));
+  };
+
+  const commitCellEdit = async (propiedad: Propiedad) => {
+    if (!editingCell || editingCell.id !== propiedad.id) return;
+    const campo = editingCell.campo;
+    setEditingCell(null);
+
+    const valorActual = String(propiedad[campo]);
+    const raw = cellValue.trim();
+    if (raw === '' || raw === valorActual) return;
+
+    const valor = campo === 'rol' ? raw : Number(raw);
+    if (campo !== 'rol' && Number.isNaN(valor as number)) return;
+
+    await guardarCampo(propiedad.id, campo, valor);
+  };
 
   const cargar = () => {
     setLoading(true);
@@ -457,22 +546,52 @@ export function PropiedadesListPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Rol</th>
-                <th>Dirección</th>
-                <th>Ubicación</th>
-                <th>Tipo</th>
-                <th>Hab</th>
-                <th>Baños</th>
-                <th>M²</th>
-                <th>Estado</th>
+                {(
+                  [
+                    ['rol', 'Rol'],
+                    ['direccion', 'Dirección'],
+                    ['ubicacion', 'Ubicación'],
+                    ['tipo', 'Tipo'],
+                    ['nHabitaciones', 'Hab'],
+                    ['nBanos', 'Baños'],
+                    ['mt2Totales', 'M²'],
+                    ['estado', 'Estado'],
+                  ] as Array<[CampoOrdenable, string]>
+                ).map(([campo, etiqueta]) => (
+                  <th key={campo} className="th-sortable" onClick={() => toggleSort(campo)}>
+                    {etiqueta}
+                    <span className="th-sortable__arrow">
+                      {sortField === campo ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </span>
+                  </th>
+                ))}
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {propiedades.map((propiedad) => (
+              {propiedadesOrdenadas.map((propiedad) => (
                 <Fragment key={propiedad.id}>
                   <tr>
-                    <td>{propiedad.rol}</td>
+                    <td
+                      className="cell-editable"
+                      onClick={() => startEditCell(propiedad, 'rol')}
+                    >
+                      {editingCell?.id === propiedad.id && editingCell.campo === 'rol' ? (
+                        <input
+                          autoFocus
+                          className="cell-input"
+                          value={cellValue}
+                          onChange={(e) => setCellValue(e.target.value)}
+                          onBlur={() => commitCellEdit(propiedad)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            if (e.key === 'Escape') setEditingCell(null);
+                          }}
+                        />
+                      ) : (
+                        propiedad.rol
+                      )}
+                    </td>
                     <td>
                       {propiedad.calle} {propiedad.numero}
                       {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
@@ -480,14 +599,57 @@ export function PropiedadesListPage() {
                     <td>
                       {propiedad.ciudad}, {propiedad.region}
                     </td>
-                    <td>{propiedad.tipo}</td>
-                    <td>{propiedad.nHabitaciones}</td>
-                    <td>{propiedad.nBanos}</td>
-                    <td>{propiedad.mt2Totales}</td>
                     <td>
-                      <span className={`badge badge--${propiedad.estado.toLowerCase()}`}>
-                        {propiedad.estado}
-                      </span>
+                      <select
+                        className="cell-select"
+                        value={propiedad.tipo}
+                        onChange={(e) => guardarCampo(propiedad.id, 'tipo', e.target.value)}
+                      >
+                        {TIPOS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    {(['nHabitaciones', 'nBanos', 'mt2Totales'] as CampoCelda[]).map((campo) => (
+                      <td
+                        key={campo}
+                        className="cell-editable"
+                        onClick={() => startEditCell(propiedad, campo)}
+                      >
+                        {editingCell?.id === propiedad.id && editingCell.campo === campo ? (
+                          <input
+                            autoFocus
+                            type="number"
+                            step={campo === 'mt2Totales' ? '0.01' : '1'}
+                            min={0}
+                            className="cell-input"
+                            value={cellValue}
+                            onChange={(e) => setCellValue(e.target.value)}
+                            onBlur={() => commitCellEdit(propiedad)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                              if (e.key === 'Escape') setEditingCell(null);
+                            }}
+                          />
+                        ) : (
+                          propiedad[campo]
+                        )}
+                      </td>
+                    ))}
+                    <td>
+                      <select
+                        className={`cell-select badge badge--${propiedad.estado.toLowerCase()}`}
+                        value={propiedad.estado}
+                        onChange={(e) => guardarCampo(propiedad.id, 'estado', e.target.value)}
+                      >
+                        {ESTADOS_PROPIEDAD.map((estado) => (
+                          <option key={estado} value={estado}>
+                            {estado}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td>
                       <div className="table__actions">
