@@ -459,12 +459,11 @@ export function PropiedadesListPage() {
               <tr>
                 <th>Rol</th>
                 <th>Dirección</th>
-                <th>Comuna</th>
-                <th>Región</th>
+                <th>Ubicación</th>
                 <th>Tipo</th>
                 <th>Hab</th>
                 <th>Baños</th>
-                <th>M² totales</th>
+                <th>M²</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -478,8 +477,9 @@ export function PropiedadesListPage() {
                       {propiedad.calle} {propiedad.numero}
                       {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
                     </td>
-                    <td>{propiedad.ciudad}</td>
-                    <td>{propiedad.region}</td>
+                    <td>
+                      {propiedad.ciudad}, {propiedad.region}
+                    </td>
                     <td>{propiedad.tipo}</td>
                     <td>{propiedad.nHabitaciones}</td>
                     <td>{propiedad.nBanos}</td>
@@ -510,7 +510,7 @@ export function PropiedadesListPage() {
 
                   {expandedId === propiedad.id && (
                     <tr>
-                      <td colSpan={10}>
+                      <td colSpan={9}>
                         <div className="proveedores-panel">
                           {proveedores.length === 0 && (
                             <p className="empty-state">Sin cuentas de proveedores registradas.</p>

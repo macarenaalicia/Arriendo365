@@ -145,7 +145,7 @@ button {
 }
 
 .layout__content {
-  max-width: 960px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 1.5rem;
 }
@@ -480,6 +480,25 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
+  scrollbar-width: auto;
+}
+
+.table-wrap::-webkit-scrollbar {
+  height: 12px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #b8bcc6;
+  border-radius: 999px;
+  border: 3px solid var(--color-bg);
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #9aa0ad;
 }
 
 .table {
