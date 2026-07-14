@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
@@ -452,133 +452,168 @@ export function PropiedadesListPage() {
         <p className="empty-state">Aún no has agregado propiedades.</p>
       )}
 
-      <div className="card-list">
-        {propiedades.map((propiedad) => (
-          <div key={propiedad.id} className="card card--static">
-            <div className="card__title">
-              {propiedad.calle} {propiedad.numero}
-              {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
-            </div>
-            <div className="card__subtitle">
-              {propiedad.ciudad}, {propiedad.region}
-            </div>
-            <div className="card__row">
-              <span className={`badge badge--${propiedad.estado.toLowerCase()}`}>
-                {propiedad.estado}
-              </span>
-              <span>{propiedad.tipo}</span>
-              <span>
-                {propiedad.nHabitaciones} hab · {propiedad.nBanos} baños
-              </span>
-            </div>
+      {!loading && propiedades.length > 0 && (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Rol</th>
+                <th>Dirección</th>
+                <th>Comuna</th>
+                <th>Región</th>
+                <th>Tipo</th>
+                <th>Hab</th>
+                <th>Baños</th>
+                <th>M² totales</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {propiedades.map((propiedad) => (
+                <Fragment key={propiedad.id}>
+                  <tr>
+                    <td>{propiedad.rol}</td>
+                    <td>
+                      {propiedad.calle} {propiedad.numero}
+                      {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
+                    </td>
+                    <td>{propiedad.ciudad}</td>
+                    <td>{propiedad.region}</td>
+                    <td>{propiedad.tipo}</td>
+                    <td>{propiedad.nHabitaciones}</td>
+                    <td>{propiedad.nBanos}</td>
+                    <td>{propiedad.mt2Totales}</td>
+                    <td>
+                      <span className={`badge badge--${propiedad.estado.toLowerCase()}`}>
+                        {propiedad.estado}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="table__actions">
+                        <button type="button" onClick={() => abrirEdicion(propiedad)}>
+                          Editar
+                        </button>
+                        <button type="button" onClick={() => toggleProveedores(propiedad.id)}>
+                          {expandedId === propiedad.id ? 'Ocultar' : 'Proveedores'}
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => handleDelete(propiedad.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
 
-            <div className="card__actions">
-              <button type="button" onClick={() => abrirEdicion(propiedad)}>
-                Editar
-              </button>
-              <button type="button" onClick={() => toggleProveedores(propiedad.id)}>
-                {expandedId === propiedad.id ? 'Ocultar proveedores' : 'Proveedores'}
-              </button>
-              <button type="button" className="danger" onClick={() => handleDelete(propiedad.id)}>
-                Eliminar
-              </button>
-            </div>
+                  {expandedId === propiedad.id && (
+                    <tr>
+                      <td colSpan={10}>
+                        <div className="proveedores-panel">
+                          {proveedores.length === 0 && (
+                            <p className="empty-state">Sin cuentas de proveedores registradas.</p>
+                          )}
+                          {proveedores.map((proveedor) => (
+                            <div key={proveedor.id} className="proveedores-panel__row">
+                              <span className="proveedores-panel__tipo">
+                                {PROVEEDOR_LABELS[proveedor.tipo]}
+                              </span>
+                              <span>{proveedor.empresa}</span>
+                              <span>{proveedor.nCliente}</span>
+                              <span className={`badge badge--${proveedor.estado.toLowerCase()}`}>
+                                {proveedor.estado}
+                              </span>
+                              <div className="proveedores-panel__row-actions">
+                                <button
+                                  type="button"
+                                  className="small"
+                                  onClick={() => abrirEdicionProveedor(proveedor)}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="danger danger--small"
+                                  onClick={() => handleDeleteProveedor(propiedad.id, proveedor.id)}
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            </div>
+                          ))}
 
-            {expandedId === propiedad.id && (
-              <div className="proveedores-panel">
-                {proveedores.length === 0 && (
-                  <p className="empty-state">Sin cuentas de proveedores registradas.</p>
-                )}
-                {proveedores.map((proveedor) => (
-                  <div key={proveedor.id} className="proveedores-panel__row">
-                    <span className="proveedores-panel__tipo">
-                      {PROVEEDOR_LABELS[proveedor.tipo]}
-                    </span>
-                    <span>{proveedor.empresa}</span>
-                    <span>{proveedor.nCliente}</span>
-                    <span className={`badge badge--${proveedor.estado.toLowerCase()}`}>
-                      {proveedor.estado}
-                    </span>
-                    <div className="proveedores-panel__row-actions">
-                      <button
-                        type="button"
-                        className="small"
-                        onClick={() => abrirEdicionProveedor(proveedor)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="danger danger--small"
-                        onClick={() => handleDeleteProveedor(propiedad.id, proveedor.id)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="proveedores-panel__add">
-                  <select
-                    value={proveedorForm.tipo}
-                    onChange={(e) => {
-                      const tipo = e.target.value as TipoProveedor;
-                      setProveedorForm({
-                        ...proveedorForm,
-                        tipo,
-                        empresa: EMPRESAS_POR_TIPO_PROVEEDOR[tipo][0],
-                      });
-                    }}
-                  >
-                    {(Object.keys(PROVEEDOR_LABELS) as TipoProveedor[]).map((tipo) => (
-                      <option key={tipo} value={tipo}>
-                        {PROVEEDOR_LABELS[tipo]}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={proveedorForm.empresa}
-                    onChange={(e) => setProveedorForm({ ...proveedorForm, empresa: e.target.value })}
-                  >
-                    {EMPRESAS_POR_TIPO_PROVEEDOR[proveedorForm.tipo].map((empresa) => (
-                      <option key={empresa} value={empresa}>
-                        {empresa}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    placeholder="N° cliente"
-                    value={proveedorForm.nCliente}
-                    onChange={(e) => setProveedorForm({ ...proveedorForm, nCliente: e.target.value })}
-                  />
-                  {editingProveedorId && (
-                    <select
-                      value={proveedorForm.estado}
-                      onChange={(e) =>
-                        setProveedorForm({
-                          ...proveedorForm,
-                          estado: e.target.value as EstadoProveedor,
-                        })
-                      }
-                    >
-                      <option value="ACTIVO">ACTIVO</option>
-                      <option value="INACTIVO">INACTIVO</option>
-                    </select>
+                          <div className="proveedores-panel__add">
+                            <select
+                              value={proveedorForm.tipo}
+                              onChange={(e) => {
+                                const tipo = e.target.value as TipoProveedor;
+                                setProveedorForm({
+                                  ...proveedorForm,
+                                  tipo,
+                                  empresa: EMPRESAS_POR_TIPO_PROVEEDOR[tipo][0],
+                                });
+                              }}
+                            >
+                              {(Object.keys(PROVEEDOR_LABELS) as TipoProveedor[]).map((tipo) => (
+                                <option key={tipo} value={tipo}>
+                                  {PROVEEDOR_LABELS[tipo]}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={proveedorForm.empresa}
+                              onChange={(e) =>
+                                setProveedorForm({ ...proveedorForm, empresa: e.target.value })
+                              }
+                            >
+                              {EMPRESAS_POR_TIPO_PROVEEDOR[proveedorForm.tipo].map((empresa) => (
+                                <option key={empresa} value={empresa}>
+                                  {empresa}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              placeholder="N° cliente"
+                              value={proveedorForm.nCliente}
+                              onChange={(e) =>
+                                setProveedorForm({ ...proveedorForm, nCliente: e.target.value })
+                              }
+                            />
+                            {editingProveedorId && (
+                              <select
+                                value={proveedorForm.estado}
+                                onChange={(e) =>
+                                  setProveedorForm({
+                                    ...proveedorForm,
+                                    estado: e.target.value as EstadoProveedor,
+                                  })
+                                }
+                              >
+                                <option value="ACTIVO">ACTIVO</option>
+                                <option value="INACTIVO">INACTIVO</option>
+                              </select>
+                            )}
+                            <button type="button" onClick={() => handleGuardarProveedor(propiedad.id)}>
+                              {editingProveedorId ? 'Guardar cambios' : 'Agregar'}
+                            </button>
+                            {editingProveedorId && (
+                              <button type="button" onClick={cancelarEdicionProveedor}>
+                                Cancelar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                  <button type="button" onClick={() => handleGuardarProveedor(propiedad.id)}>
-                    {editingProveedorId ? 'Guardar cambios' : 'Agregar'}
-                  </button>
-                  {editingProveedorId && (
-                    <button type="button" onClick={cancelarEdicionProveedor}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

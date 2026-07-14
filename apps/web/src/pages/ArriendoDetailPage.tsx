@@ -86,30 +86,32 @@ export function ArriendoDetailPage() {
         <h2>Pagos</h2>
         {pagos.length === 0 && <p className="empty-state">Sin pagos registrados.</p>}
         {pagos.length > 0 && (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Periodo</th>
-                <th>Comprometido</th>
-                <th>Monto</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagos.map((pago) => (
-                <tr key={pago.id}>
-                  <td>{formatFecha(pago.periodo)}</td>
-                  <td>{formatFecha(pago.fechaComprometida)}</td>
-                  <td>{formatMonto(pago.monto)}</td>
-                  <td>
-                    <span className={`badge badge--${pago.estado.toLowerCase()}`}>
-                      {pago.estado}
-                    </span>
-                  </td>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Periodo</th>
+                  <th>Comprometido</th>
+                  <th>Monto</th>
+                  <th>Estado</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagos.map((pago) => (
+                  <tr key={pago.id}>
+                    <td>{formatFecha(pago.periodo)}</td>
+                    <td>{formatFecha(pago.fechaComprometida)}</td>
+                    <td>{formatMonto(pago.monto)}</td>
+                    <td>
+                      <span className={`badge badge--${pago.estado.toLowerCase()}`}>
+                        {pago.estado}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

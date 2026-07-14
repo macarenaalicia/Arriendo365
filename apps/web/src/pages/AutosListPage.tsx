@@ -135,25 +135,43 @@ export function AutosListPage() {
 
       {!loading && autos.length === 0 && <p className="empty-state">Aún no has agregado autos.</p>}
 
-      <div className="card-list">
-        {autos.map((auto) => (
-          <div key={auto.id} className="card card--static">
-            <div className="card__title">{auto.patente}</div>
-            <div className="card__row">
-              <span className={`badge badge--${auto.estado.toLowerCase()}`}>{auto.estado}</span>
-              <span>{auto.kilometraje.toLocaleString('es-CL')} km</span>
-            </div>
-            <div className="card__actions">
-              <button type="button" onClick={() => abrirEdicion(auto)}>
-                Editar
-              </button>
-              <button type="button" className="danger" onClick={() => handleDelete(auto.id)}>
-                Eliminar
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      {!loading && autos.length > 0 && (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Patente</th>
+                <th>Kilometraje</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {autos.map((auto) => (
+                <tr key={auto.id}>
+                  <td>{auto.patente}</td>
+                  <td>{auto.kilometraje.toLocaleString('es-CL')} km</td>
+                  <td>
+                    <span className={`badge badge--${auto.estado.toLowerCase()}`}>
+                      {auto.estado}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="table__actions">
+                      <button type="button" onClick={() => abrirEdicion(auto)}>
+                        Editar
+                      </button>
+                      <button type="button" className="danger" onClick={() => handleDelete(auto.id)}>
+                        Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -475,13 +475,16 @@ button {
   color: var(--color-text-muted);
 }
 
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  overflow: hidden;
 }
 
 .table th,
@@ -490,6 +493,7 @@ button {
   padding: 0.6rem 0.9rem;
   border-bottom: 1px solid var(--color-border);
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .table th {
@@ -499,8 +503,41 @@ button {
   text-transform: uppercase;
 }
 
+.table tbody tr:hover {
+  background: var(--color-bg);
+}
+
 .table tr:last-child td {
   border-bottom: none;
+}
+
+.table__actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.table__actions button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.table__actions button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.table__actions button.danger {
+  color: #c0392b;
+}
+
+.table__actions button.danger:hover {
+  border-color: #c0392b;
+  background: #fee2e2;
 }
 
 /* Resumen de pagos */
