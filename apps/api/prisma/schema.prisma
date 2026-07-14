@@ -20,6 +20,7 @@ enum TipoPropiedad {
   CASA
   DEPARTAMENTO
   HABITACION
+  TERRENO
 }
 
 enum EstadoPropiedad {

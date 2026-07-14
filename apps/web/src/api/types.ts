@@ -4,7 +4,7 @@ export type EstadoArriendo = 'ACTIVO' | 'INACTIVO' | 'TERMINADO';
 
 export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ATRASADO' | 'RECHAZADO';
 
-export type TipoPropiedad = 'CASA' | 'DEPARTAMENTO' | 'HABITACION';
+export type TipoPropiedad = 'CASA' | 'DEPARTAMENTO' | 'HABITACION' | 'TERRENO';
 
 export type EstadoPropiedad = 'DISPONIBLE' | 'ARRENDADA' | 'EN_MANTENCION';
 

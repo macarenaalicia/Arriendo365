@@ -3,7 +3,7 @@ import { api, ApiError } from '../api/client';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
 
-const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION'] as const;
+const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
 
 const FORM_INICIAL = {
   rol: '',
