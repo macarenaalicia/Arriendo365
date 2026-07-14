@@ -50,12 +50,14 @@ export function AutosListPage() {
 
   const [mantenciones, setMantenciones] = useState<MantencionAuto[]>([]);
   const [mantencionForm, setMantencionForm] = useState(MANTENCION_FORM_INICIAL);
+  const [mantencionError, setMantencionError] = useState<string | null>(null);
   const [editingMantencionId, setEditingMantencionId] = useState<string | null>(null);
   const [showNuevaConfig, setShowNuevaConfig] = useState(false);
   const [nuevaConfigForm, setNuevaConfigForm] = useState(NUEVA_CONFIG_INICIAL);
 
   const [arriendosAuto, setArriendosAuto] = useState<ArriendoAuto[]>([]);
   const [arriendoForm, setArriendoForm] = useState(ARRIENDO_FORM_INICIAL);
+  const [arriendoError, setArriendoError] = useState<string | null>(null);
   const [editingArriendoId, setEditingArriendoId] = useState<string | null>(null);
 
   const cargar = () => {
@@ -141,6 +143,7 @@ export function AutosListPage() {
     setExpanded({ autoId, panel: 'mantenciones' });
     setEditingMantencionId(null);
     setMantencionForm(MANTENCION_FORM_INICIAL);
+    setMantencionError(null);
     setShowNuevaConfig(false);
     const lista = await api.get<MantencionAuto[]>(`/autos/${autoId}/mantenciones`);
     setMantenciones(lista);
@@ -148,6 +151,7 @@ export function AutosListPage() {
 
   const abrirEdicionMantencion = (mantencion: MantencionAuto) => {
     setEditingMantencionId(mantencion.id);
+    setMantencionError(null);
     setMantencionForm({
       configuracionId: mantencion.configuracionId,
       kilometrajeActual: String(mantencion.kilometrajeActual),
@@ -159,6 +163,7 @@ export function AutosListPage() {
   const cancelarEdicionMantencion = () => {
     setEditingMantencionId(null);
     setMantencionForm(MANTENCION_FORM_INICIAL);
+    setMantencionError(null);
   };
 
   const handleCrearConfiguracion = async () => {
@@ -176,8 +181,10 @@ export function AutosListPage() {
 
   const handleGuardarMantencion = async (autoId: string) => {
     if (!mantencionForm.configuracionId || !mantencionForm.kilometrajeActual || !mantencionForm.fechaMantencion) {
+      setMantencionError('Elige el tipo de mantención, el km actual y la fecha.');
       return;
     }
+    setMantencionError(null);
 
     const payload = {
       configuracionId: mantencionForm.configuracionId,
@@ -195,7 +202,10 @@ export function AutosListPage() {
     }
 
     setEditingMantencionId(null);
-    setMantencionForm(MANTENCION_FORM_INICIAL);
+    setMantencionForm({
+      ...MANTENCION_FORM_INICIAL,
+      configuracionId: mantencionForm.configuracionId,
+    });
     const lista = await api.get<MantencionAuto[]>(`/autos/${autoId}/mantenciones`);
     setMantenciones(lista);
   };
@@ -216,12 +226,14 @@ export function AutosListPage() {
     setExpanded({ autoId, panel: 'arrendatario' });
     setEditingArriendoId(null);
     setArriendoForm(ARRIENDO_FORM_INICIAL);
+    setArriendoError(null);
     const lista = await api.get<ArriendoAuto[]>(`/arriendos-auto?autoId=${autoId}`);
     setArriendosAuto(lista);
   };
 
   const abrirEdicionArriendo = (arriendo: ArriendoAuto) => {
     setEditingArriendoId(arriendo.id);
+    setArriendoError(null);
     setArriendoForm({
       arrendatarioId: arriendo.arrendatarioId,
       kilometrajeEntrega: String(arriendo.kilometrajeEntrega),
@@ -233,10 +245,15 @@ export function AutosListPage() {
   const cancelarEdicionArriendo = () => {
     setEditingArriendoId(null);
     setArriendoForm(ARRIENDO_FORM_INICIAL);
+    setArriendoError(null);
   };
 
   const handleGuardarArriendo = async (autoId: string) => {
-    if (!arriendoForm.arrendatarioId || !arriendoForm.kilometrajeEntrega) return;
+    if (!arriendoForm.arrendatarioId || !arriendoForm.kilometrajeEntrega) {
+      setArriendoError('Elige el arrendatario y el km de entrega.');
+      return;
+    }
+    setArriendoError(null);
 
     if (editingArriendoId) {
       await api.patch(`/arriendos-auto/${editingArriendoId}`, {
@@ -371,6 +388,7 @@ export function AutosListPage() {
                           {mantenciones.length === 0 && (
                             <p className="empty-state">Sin mantenciones registradas.</p>
                           )}
+                          {mantencionError && <p className="auth-card__error">{mantencionError}</p>}
                           {mantenciones.map((m) => (
                             <div key={m.id} className="proveedores-panel__row">
                               <span className="proveedores-panel__tipo">{m.configuracion.tipo}</span>
@@ -484,6 +502,7 @@ export function AutosListPage() {
                           {arriendosAuto.length === 0 && (
                             <p className="empty-state">Sin arrendatario registrado.</p>
                           )}
+                          {arriendoError && <p className="auth-card__error">{arriendoError}</p>}
                           {arriendosAuto.map((a) => (
                             <div key={a.id} className="proveedores-panel__row">
                               <span className="proveedores-panel__tipo">{a.arrendatario.nombreCompleto}</span>
