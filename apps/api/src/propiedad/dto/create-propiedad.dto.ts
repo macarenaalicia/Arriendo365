@@ -21,6 +21,10 @@ export class CreatePropiedadDto {
 
   @IsOptional()
   @IsString()
+  numeroDepartamento?: string;
+
+  @IsOptional()
+  @IsString()
   sector?: string;
 
   @IsString()

@@ -205,6 +205,104 @@ button {
   border-color: var(--color-border);
 }
 
+.card__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.card__actions button {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.card__actions button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.card__actions button.danger {
+  color: #c0392b;
+}
+
+.card__actions button.danger:hover {
+  border-color: #c0392b;
+  background: #fee2e2;
+}
+
+.proveedores-panel {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.proveedores-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.85rem;
+}
+
+.proveedores-panel__tipo {
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.proveedores-panel__row .danger--small {
+  margin-left: auto;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: #c0392b;
+}
+
+.proveedores-panel__add {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.proveedores-panel__add select,
+.proveedores-panel__add input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.proveedores-panel__add button {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.inline-form__fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.8rem 1rem 1rem;
+}
+
+.inline-form__fieldset legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 0 0.3rem;
+}
+
 .card__title {
   font-weight: 600;
 }

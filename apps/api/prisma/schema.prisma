@@ -230,6 +230,7 @@ model Propiedad {
   rol                   String
   calle                 String
   numero                String
+  numeroDepartamento    String?
   sector                String?
   ciudad                String
   region                String

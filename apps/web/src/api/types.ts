@@ -10,11 +10,16 @@ export type EstadoPropiedad = 'DISPONIBLE' | 'ARRENDADA' | 'EN_MANTENCION';
 
 export type EstadoAuto = 'DISPONIBLE' | 'ARRENDADO' | 'EN_MANTENCION';
 
+export type TipoProveedor = 'AGUA' | 'LUZ' | 'GAS';
+
+export type EstadoProveedor = 'ACTIVO' | 'INACTIVO';
+
 export interface Propiedad {
   id: string;
   rol: string;
   calle: string;
   numero: string;
+  numeroDepartamento: string | null;
   sector: string | null;
   ciudad: string;
   region: string;
@@ -30,6 +35,14 @@ export interface Propiedad {
   descripcion: string | null;
   estado: EstadoPropiedad;
   pagaContribuciones: boolean;
+}
+
+export interface Proveedor {
+  id: string;
+  propiedadId: string;
+  tipo: TipoProveedor;
+  nCliente: string;
+  estado: EstadoProveedor;
 }
 
 export interface Auto {
