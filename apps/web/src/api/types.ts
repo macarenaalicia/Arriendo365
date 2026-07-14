@@ -68,6 +68,33 @@ export interface Persona {
   telefono: string | null;
 }
 
+export interface ConfiguracionMantencion {
+  id: string;
+  tipo: string;
+  cadaKm: number;
+}
+
+export interface MantencionAuto {
+  id: string;
+  autoId: string;
+  configuracionId: string;
+  kilometrajeActual: number;
+  kilometrajeProxima: number | null;
+  fechaMantencion: string;
+  configuracion: ConfiguracionMantencion;
+}
+
+export interface ArriendoAuto {
+  id: string;
+  autoId: string;
+  arrendatarioId: string;
+  kilometrajeEntrega: number;
+  kilometrajeRecepcion: number | null;
+  contratoDocId: string | null;
+  estado: EstadoArriendo;
+  arrendatario: Persona;
+}
+
 export interface ArriendoPropiedad {
   id: string;
   propiedadId: string;

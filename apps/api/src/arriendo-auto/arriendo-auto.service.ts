@@ -44,7 +44,11 @@ export class ArriendoAutoService {
 
   findAll(query: FindArriendosAutoDto) {
     return this.prisma.arriendoAuto.findMany({
-      where: { auto: { organizacionId: this.tenant.organizacionId }, estado: query.estado },
+      where: {
+        auto: { organizacionId: this.tenant.organizacionId },
+        estado: query.estado,
+        autoId: query.autoId,
+      },
       include: DETALLE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
