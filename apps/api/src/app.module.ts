@@ -11,6 +11,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PropiedadModule } from './propiedad/propiedad.module';
 import { ProveedorModule } from './proveedor/proveedor.module';
+import { PersonaModule } from './persona/persona.module';
+import { ArriendoPropiedadModule } from './arriendo-propiedad/arriendo-propiedad.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { ProveedorModule } from './proveedor/proveedor.module';
     AuthModule,
     PropiedadModule,
     ProveedorModule,
+    PersonaModule,
+    ArriendoPropiedadModule,
   ],
   controllers: [AppController],
   providers: [
