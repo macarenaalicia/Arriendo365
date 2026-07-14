@@ -13,6 +13,15 @@ import { PropiedadModule } from './propiedad/propiedad.module';
 import { ProveedorModule } from './proveedor/proveedor.module';
 import { PersonaModule } from './persona/persona.module';
 import { ArriendoPropiedadModule } from './arriendo-propiedad/arriendo-propiedad.module';
+import { PagoModule } from './pago/pago.module';
+import { RequerimientoModule } from './requerimiento/requerimiento.module';
+import { AutoModule } from './auto/auto.module';
+import { ConfiguracionMantencionModule } from './configuracion-mantencion/configuracion-mantencion.module';
+import { ArriendoAutoModule } from './arriendo-auto/arriendo-auto.module';
+import { StorageModule } from './storage/storage.module';
+import { DocumentoModule } from './documento/documento.module';
+import { FotoModule } from './foto/foto.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -24,6 +33,15 @@ import { ArriendoPropiedadModule } from './arriendo-propiedad/arriendo-propiedad
     ProveedorModule,
     PersonaModule,
     ArriendoPropiedadModule,
+    PagoModule,
+    RequerimientoModule,
+    AutoModule,
+    ConfiguracionMantencionModule,
+    ArriendoAutoModule,
+    StorageModule,
+    DocumentoModule,
+    FotoModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [
