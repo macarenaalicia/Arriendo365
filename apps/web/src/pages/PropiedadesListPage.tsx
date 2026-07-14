@@ -15,9 +15,10 @@ type CampoOrdenable =
   | 'nHabitaciones'
   | 'nBanos'
   | 'mt2Totales'
+  | 'mt2Construidos'
   | 'estado';
 
-type CampoCelda = 'rol' | 'nHabitaciones' | 'nBanos' | 'mt2Totales';
+type CampoCelda = 'rol' | 'nHabitaciones' | 'nBanos' | 'mt2Totales' | 'mt2Construidos';
 
 const FORM_INICIAL = {
   rol: '',
@@ -102,6 +103,8 @@ export function PropiedadesListPage() {
         return propiedad.nBanos;
       case 'mt2Totales':
         return Number(propiedad.mt2Totales);
+      case 'mt2Construidos':
+        return Number(propiedad.mt2Construidos);
       case 'estado':
         return propiedad.estado;
     }
@@ -555,7 +558,8 @@ export function PropiedadesListPage() {
                     ['tipo', 'Tipo'],
                     ['nHabitaciones', 'Hab'],
                     ['nBanos', 'Baños'],
-                    ['mt2Totales', 'M²'],
+                    ['mt2Totales', 'M² totales'],
+                    ['mt2Construidos', 'M² construidos'],
                     ['estado', 'Estado'],
                   ] as Array<[CampoOrdenable, string]>
                 ).map(([campo, etiqueta]) => (
@@ -613,7 +617,9 @@ export function PropiedadesListPage() {
                         ))}
                       </select>
                     </td>
-                    {(['nHabitaciones', 'nBanos', 'mt2Totales'] as CampoCelda[]).map((campo) => (
+                    {(
+                      ['nHabitaciones', 'nBanos', 'mt2Totales', 'mt2Construidos'] as CampoCelda[]
+                    ).map((campo) => (
                       <td
                         key={campo}
                         className="cell-editable"
@@ -623,7 +629,7 @@ export function PropiedadesListPage() {
                           <input
                             autoFocus
                             type="number"
-                            step={campo === 'mt2Totales' ? '0.01' : '1'}
+                            step={campo === 'mt2Totales' || campo === 'mt2Construidos' ? '0.01' : '1'}
                             min={0}
                             className="cell-input"
                             value={cellValue}
@@ -673,7 +679,7 @@ export function PropiedadesListPage() {
 
                   {expandedId === propiedad.id && (
                     <tr>
-                      <td colSpan={9}>
+                      <td colSpan={10}>
                         <div className="proveedores-panel">
                           {proveedores.length === 0 && (
                             <p className="empty-state">Sin cuentas de proveedores registradas.</p>
