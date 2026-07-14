@@ -1,0 +1,36 @@
+import { ProveedorService } from './proveedor.service';
+import { CreateProveedorDto } from './dto/create-proveedor.dto';
+import { UpdateProveedorDto } from './dto/update-proveedor.dto';
+export declare class ProveedorController {
+    private readonly proveedorService;
+    constructor(proveedorService: ProveedorService);
+    create(propiedadId: string, dto: CreateProveedorDto): Promise<{
+        id: string;
+        tipo: import("@prisma/client").$Enums.TipoProveedor;
+        estado: import("@prisma/client").$Enums.EstadoProveedor;
+        nCliente: string;
+        propiedadId: string;
+    }>;
+    findAll(propiedadId: string): Promise<{
+        id: string;
+        tipo: import("@prisma/client").$Enums.TipoProveedor;
+        estado: import("@prisma/client").$Enums.EstadoProveedor;
+        nCliente: string;
+        propiedadId: string;
+    }[]>;
+    findOne(propiedadId: string, id: string): Promise<{
+        id: string;
+        tipo: import("@prisma/client").$Enums.TipoProveedor;
+        estado: import("@prisma/client").$Enums.EstadoProveedor;
+        nCliente: string;
+        propiedadId: string;
+    }>;
+    update(propiedadId: string, id: string, dto: UpdateProveedorDto): Promise<{
+        id: string;
+        tipo: import("@prisma/client").$Enums.TipoProveedor;
+        estado: import("@prisma/client").$Enums.EstadoProveedor;
+        nCliente: string;
+        propiedadId: string;
+    }>;
+    remove(propiedadId: string, id: string): Promise<void>;
+}

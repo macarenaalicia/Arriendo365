@@ -1,0 +1,496 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- ENUMS ----------
+
+enum RolUsuario {
+  ADMINISTRADOR
+  PROPIETARIO
+  ARRENDATARIO
+  TECNICO
+}
+
+enum TipoPropiedad {
+  CASA
+  DEPARTAMENTO
+  HABITACION
+}
+
+enum EstadoPropiedad {
+  DISPONIBLE
+  ARRENDADA
+  EN_MANTENCION
+}
+
+enum TipoProveedor {
+  AGUA
+  LUZ
+  GAS
+}
+
+enum EstadoProveedor {
+  ACTIVO
+  INACTIVO
+}
+
+enum EstadoArriendo {
+  ACTIVO
+  INACTIVO
+  TERMINADO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  PAGADO
+  ATRASADO
+  RECHAZADO
+}
+
+enum UrgenciaRequerimiento {
+  CRITICA
+  MEDIA
+  BAJA
+}
+
+enum EstadoRequerimiento {
+  PENDIENTE_REVISION
+  REVISION_AGENDADA
+  EN_REVISION
+  RESUELTO
+}
+
+enum TipoReparacion {
+  ESTRUCTURAL
+  LOCATIVA
+}
+
+enum QuienPago {
+  PROPIETARIO
+  ARRENDATARIO
+}
+
+enum EstadoAuto {
+  DISPONIBLE
+  ARRENDADO
+  EN_MANTENCION
+}
+
+enum TipoDocumentoAuto {
+  PERMISO_CIRCULACION
+  REVISION_TECNICA
+  SOAP
+}
+
+enum EstadoDocumentoAuto {
+  ACTIVO
+  VENCIDO
+}
+
+enum Periodicidad {
+  MENSUAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+enum TipoPagoVehiculo {
+  SEGURO
+  TAG
+  REVISION_TECNICA
+  PERMISO_CIRCULACION
+  SOAP
+}
+
+enum TipoCobroAuto {
+  TAG
+  ARRIENDO
+  REPARACION
+  DEVOLUCION
+}
+
+// ---------- TENANT ----------
+
+model Organizacion {
+  id        String   @id @default(uuid())
+  nombre    String
+  plan      String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios    Usuario[]
+  personas    Persona[]
+  propiedades Propiedad[]
+  autos       Auto[]
+
+  @@map("organizacion")
+}
+
+model Usuario {
+  id             String       @id @default(uuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  personaId      String
+  persona        Persona      @relation(fields: [personaId], references: [id])
+  rol            RolUsuario
+  passwordHash   String
+  activo         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("usuario")
+}
+
+// ---------- PERSONA (entidad transversal) ----------
+
+model Persona {
+  id                    String    @id @default(uuid())
+  organizacionId        String
+  organizacion          Organizacion @relation(fields: [organizacionId], references: [id])
+  nombreCompleto        String
+  rut                   String
+  fechaNacimiento       DateTime?
+  direccion             String?
+  telefono              String?
+  email                 String?
+  dicom360DocId         String?
+  carnetFrontalFotoId   String?
+  carnetTraseraFotoId   String?
+  licenciaFrontalFotoId String?
+  licenciaTraseraFotoId String?
+  contratoTrabajoDocId  String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  recomendaciones         PersonaRecomendacion[]
+  usuarios                Usuario[]
+  arriendosPropiedad      ArriendoPropiedad[] @relation("ArrendatarioPropiedad")
+  codeudorDe              ArriendoPropiedad[] @relation("CodeudorPropiedad")
+  arriendosAuto           ArriendoAuto[]
+  requerimientosAsignados Requerimiento[]
+  mensajes                ChatMensaje[]
+
+  @@unique([organizacionId, rut])
+  @@map("persona")
+}
+
+model PersonaRecomendacion {
+  id             String  @id @default(uuid())
+  personaId      String
+  persona        Persona @relation(fields: [personaId], references: [id])
+  nombreCompleto String
+  numeroContacto String
+
+  @@map("persona_recomendacion")
+}
+
+// ---------- DOCUMENTO / FOTO (transversales, polimórficas) ----------
+// entidadTipo + entidadId se validan a nivel de aplicación (Prisma no soporta
+// FK polimórfica nativa). Ver nota en brief_claude_code.md.
+
+model Documento {
+  id               String    @id @default(uuid())
+  tipo             String
+  archivoUrl       String
+  fechaEmision     DateTime?
+  fechaVencimiento DateTime?
+  entidadTipo      String
+  entidadId        String
+  createdAt        DateTime  @default(now())
+
+  @@index([entidadTipo, entidadId])
+  @@map("documento")
+}
+
+model Foto {
+  id          String   @id @default(uuid())
+  archivoUrl  String
+  descripcion String?
+  categoria   String?
+  entidadTipo String
+  entidadId   String
+  createdAt   DateTime @default(now())
+
+  @@index([entidadTipo, entidadId])
+  @@map("foto")
+}
+
+// ---------- PROPIEDADES ----------
+
+model Propiedad {
+  id                    String          @id @default(uuid())
+  organizacionId        String
+  organizacion          Organizacion    @relation(fields: [organizacionId], references: [id])
+  rol                   String
+  calle                 String
+  numero                String
+  sector                String?
+  ciudad                String
+  region                String
+  tipo                  TipoPropiedad
+  nHabitaciones         Int
+  nBanos                Int
+  bodega                Boolean         @default(false)
+  bodegaNumero          String?
+  estacionamiento       Boolean         @default(false)
+  estacionamientoNumero String?
+  mt2Totales            Decimal         @db.Decimal(8, 2)
+  mt2Construidos        Decimal         @db.Decimal(8, 2)
+  descripcion           String?
+  estado                EstadoPropiedad @default(DISPONIBLE)
+  pagaContribuciones    Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  proveedores Proveedor[]
+  arriendos   ArriendoPropiedad[]
+
+  @@map("propiedad")
+}
+
+model Proveedor {
+  id          String          @id @default(uuid())
+  propiedadId String
+  propiedad   Propiedad       @relation(fields: [propiedadId], references: [id])
+  tipo        TipoProveedor
+  nCliente    String
+  estado      EstadoProveedor @default(ACTIVO)
+
+  @@map("proveedor")
+}
+
+// ---------- ARRIENDO DE PROPIEDAD (entidad raíz del sistema) ----------
+
+model ArriendoPropiedad {
+  id                      String         @id @default(uuid())
+  propiedadId             String
+  propiedad               Propiedad      @relation(fields: [propiedadId], references: [id])
+  arrendatarioId          String
+  arrendatario            Persona        @relation("ArrendatarioPropiedad", fields: [arrendatarioId], references: [id])
+  codeudorId              String?
+  codeudor                Persona?       @relation("CodeudorPropiedad", fields: [codeudorId], references: [id])
+  fechaPago               Int
+  fechaEntrega            DateTime
+  fechaRecepcion          DateTime?
+  periodoAlza             String
+  garantia                Boolean        @default(false)
+  garantiaMontoPactado    Decimal?       @db.Decimal(10, 2)
+  garantiaMontoPagado     Decimal?       @db.Decimal(10, 2)
+  garantiaFechaDevolucion DateTime?
+  garantiaMontoDevuelto   Decimal?       @db.Decimal(10, 2)
+  garantiaMotivoRetencion String?
+  montoArriendo           Decimal        @db.Decimal(10, 2)
+  actaEntregaDetalle      String?
+  actaRecepcionDetalle    String?
+  estado                  EstadoArriendo @default(ACTIVO)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  inventario     ArriendoInventario[]
+  requerimientos Requerimiento[]
+
+  @@map("arriendo_propiedad")
+}
+
+model ArriendoInventario {
+  id                  String            @id @default(uuid())
+  arriendoPropiedadId String
+  arriendoPropiedad   ArriendoPropiedad @relation(fields: [arriendoPropiedadId], references: [id])
+  fotoId              String
+  descripcion         String?
+
+  @@map("arriendo_inventario")
+}
+
+// Pago es polimórfico entre ArriendoPropiedad y ArriendoAuto (arriendoTipo + arriendoId).
+// Sin relación formal en Prisma por el mismo motivo que Documento/Foto: se valida en la app.
+model Pago {
+  id                String     @id @default(uuid())
+  arriendoTipo      String // "propiedad" | "auto"
+  arriendoId        String
+  periodo           DateTime
+  fechaComprometida DateTime
+  fechaPagoReal     DateTime?
+  monto             Decimal    @db.Decimal(10, 2)
+  medioPago         String?
+  estado            EstadoPago @default(PENDIENTE)
+  comprobanteFotoId String?
+  aprobado          Boolean?
+  createdAt         DateTime   @default(now())
+
+  @@index([arriendoTipo, arriendoId])
+  @@map("pago")
+}
+
+// ---------- REQUERIMIENTOS ----------
+
+model Requerimiento {
+  id                  String                @id @default(uuid())
+  arriendoPropiedadId String
+  arriendoPropiedad   ArriendoPropiedad     @relation(fields: [arriendoPropiedadId], references: [id])
+  urgencia            UrgenciaRequerimiento
+  estado              EstadoRequerimiento   @default(PENDIENTE_REVISION)
+  tecnicoId           String?
+  tecnico             Persona?              @relation(fields: [tecnicoId], references: [id])
+  tipoReparacion      TipoReparacion
+  detalleResolucion   String?
+  notasInternas       String?
+  notasArrendatario   String?
+  fechaComprometida   DateTime?
+  fechaSolucion       DateTime?
+  valorPagado         Decimal?              @db.Decimal(10, 2)
+  quienPago           QuienPago?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  presupuestos RequerimientoPresupuesto[]
+  gastos       Gasto[]
+
+  @@map("requerimiento")
+}
+
+model RequerimientoPresupuesto {
+  id              String        @id @default(uuid())
+  requerimientoId String
+  requerimiento   Requerimiento @relation(fields: [requerimientoId], references: [id])
+  fotoId          String
+  valor           Decimal       @db.Decimal(10, 2)
+
+  @@map("requerimiento_presupuesto")
+}
+
+model Gasto {
+  id              String        @id @default(uuid())
+  requerimientoId String
+  requerimiento   Requerimiento @relation(fields: [requerimientoId], references: [id])
+  fotoBoletaId    String?
+  valor           Decimal       @db.Decimal(10, 2)
+  detalle         String?
+
+  @@map("gasto")
+}
+
+// ---------- VEHÍCULOS ----------
+
+model Auto {
+  id             String       @id @default(uuid())
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  patente        String
+  kilometraje    Int
+  padronDocId    String?
+  estado         EstadoAuto   @default(DISPONIBLE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  documentos    DocumentoAuto[]
+  mantenciones  MantencionAuto[]
+  arriendos     ArriendoAuto[]
+  pagosVehiculo PagoVehiculo[]
+  cobros        CobroAuto[]
+
+  @@unique([organizacionId, patente])
+  @@map("auto")
+}
+
+model DocumentoAuto {
+  id               String              @id @default(uuid())
+  autoId           String
+  auto             Auto                @relation(fields: [autoId], references: [id])
+  tipo             TipoDocumentoAuto
+  fechaRealizacion DateTime
+  fechaVencimiento DateTime
+  estado           EstadoDocumentoAuto @default(ACTIVO)
+
+  @@map("documento_auto")
+}
+
+model ConfiguracionMantencion {
+  id     String @id @default(uuid())
+  tipo   String
+  cadaKm Int
+
+  mantenciones MantencionAuto[]
+
+  @@map("configuracion_mantencion")
+}
+
+model MantencionAuto {
+  id                 String                  @id @default(uuid())
+  autoId             String
+  auto               Auto                    @relation(fields: [autoId], references: [id])
+  configuracionId    String
+  configuracion      ConfiguracionMantencion @relation(fields: [configuracionId], references: [id])
+  kilometrajeActual  Int
+  kilometrajeProxima Int?
+  fechaMantencion    DateTime
+
+  @@map("mantencion_auto")
+}
+
+model ArriendoAuto {
+  id                   String         @id @default(uuid())
+  autoId               String
+  auto                 Auto           @relation(fields: [autoId], references: [id])
+  arrendatarioId       String
+  arrendatario         Persona        @relation(fields: [arrendatarioId], references: [id])
+  kilometrajeEntrega   Int
+  kilometrajeRecepcion Int?
+  contratoDocId        String?
+  estado               EstadoArriendo @default(ACTIVO)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@map("arriendo_auto")
+}
+
+model PagoVehiculo {
+  id                String           @id @default(uuid())
+  autoId            String
+  auto              Auto             @relation(fields: [autoId], references: [id])
+  tipo              TipoPagoVehiculo
+  periodicidad      Periodicidad
+  conCredito        Boolean          @default(false)
+  cuotas            Int?
+  montoCuota        Decimal?         @db.Decimal(10, 2)
+  monto             Decimal          @db.Decimal(10, 2)
+  fechaPago         DateTime
+  comprobanteFotoId String?
+
+  @@map("pago_vehiculo")
+}
+
+model CobroAuto {
+  id          String        @id @default(uuid())
+  autoId      String
+  auto        Auto          @relation(fields: [autoId], references: [id])
+  tipo        TipoCobroAuto
+  responsable QuienPago
+  quienReparo QuienPago?
+  valor       Decimal       @db.Decimal(10, 2)
+  detalle     String?
+
+  @@map("cobro_auto")
+}
+
+// ---------- COMUNICACIÓN ----------
+// Polimórfico igual que Pago: arriendoTipo + arriendoId sin relación formal.
+
+model ChatMensaje {
+  id           String   @id @default(uuid())
+  arriendoTipo String
+  arriendoId   String
+  autorId      String
+  autor        Persona  @relation(fields: [autorId], references: [id])
+  mensaje      String
+  fecha        DateTime @default(now())
+
+  @@index([arriendoTipo, arriendoId])
+  @@map("chat_mensaje")
+}
