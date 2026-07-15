@@ -2,15 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { ArriendoPropiedad, Pago } from '../api/types';
+import { formatFecha } from '../lib/format';
 
 function formatMonto(monto: string | number) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(
     Number(monto),
   );
-}
-
-function formatFecha(fecha: string) {
-  return new Intl.DateTimeFormat('es-CL').format(new Date(fecha));
 }
 
 export function ArriendoDetailPage() {

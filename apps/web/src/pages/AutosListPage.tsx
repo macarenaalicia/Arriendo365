@@ -9,7 +9,7 @@ import type {
   MantencionAuto,
   Persona,
 } from '../api/types';
-import { formatEnumLabel } from '../lib/format';
+import { formatEnumLabel, formatFecha } from '../lib/format';
 
 const ESTADOS: EstadoAuto[] = ['DISPONIBLE', 'ARRENDADO', 'EN_MANTENCION'];
 const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
@@ -413,7 +413,7 @@ export function AutosListPage() {
                                   ? `próxima ${m.kilometrajeProxima.toLocaleString('es-CL')} km`
                                   : ''}
                               </span>
-                              <span>{m.fechaMantencion.slice(0, 10)}</span>
+                              <span>{formatFecha(m.fechaMantencion)}</span>
                               <div className="proveedores-panel__row-actions">
                                 <button type="button" className="small" onClick={() => abrirEdicionMantencion(m)}>
                                   Editar
