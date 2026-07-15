@@ -5,6 +5,8 @@ import type { ArriendoPropiedad, EstadoArriendo, Persona, Propiedad } from '../a
 import { ddmmyyyyToIso } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 
+const PERIODOS_ALZA = ['MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL', 'SIN REAJUSTE'] as const;
+
 const ESTADOS: Array<{ value: EstadoArriendo | ''; label: string }> = [
   { value: '', label: 'Todos' },
   { value: 'ACTIVO', label: 'Activos' },
@@ -186,12 +188,17 @@ export function ArriendosListPage() {
             </label>
             <label>
               Periodo de reajuste
-              <input
+              <select
                 required
-                placeholder="ej. ANUAL"
                 value={form.periodoAlza}
                 onChange={(e) => setForm({ ...form, periodoAlza: e.target.value })}
-              />
+              >
+                {PERIODOS_ALZA.map((periodo) => (
+                  <option key={periodo} value={periodo}>
+                    {periodo}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Monto arriendo
