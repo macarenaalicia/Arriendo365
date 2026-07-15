@@ -625,6 +625,20 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.pagos-arrendatario__bloque {
+  margin-bottom: 1.5rem;
+}
+
+.pagos-arrendatario__bloque h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pagos-arrendatario__bloque h2 a:hover {
+  color: var(--color-primary);
 }
 
 .stat-card {

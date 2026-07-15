@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import type { ArriendoPropiedad, EstadoArriendo, Persona, Propiedad } from '../api/types';
 import { ddmmyyyyToIso } from '../lib/format';
 import { DateInput } from '../components/DateInput';
@@ -33,6 +34,9 @@ function formatMonto(monto: string) {
 }
 
 export function ArriendosListPage() {
+  const { rol } = useAuth();
+  const esStaff = rol !== 'ARRENDATARIO';
+
   const [arriendos, setArriendos] = useState<ArriendoPropiedad[]>([]);
   const [estado, setEstado] = useState<EstadoArriendo | ''>('ACTIVO');
   const [loading, setLoading] = useState(true);
@@ -58,9 +62,10 @@ export function ArriendosListPage() {
 
   useEffect(cargar, [estado]);
   useEffect(() => {
+    if (!esStaff) return;
     api.get<Propiedad[]>('/propiedades').then(setPropiedades);
     api.get<Persona[]>('/personas').then(setPersonas);
-  }, []);
+  }, [esStaff]);
 
   const cerrarForm = () => {
     setShowForm(false);
@@ -114,13 +119,15 @@ export function ArriendosListPage() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={showForm ? cerrarForm : () => setShowForm(true)}>
-            {showForm ? 'Cancelar' : '+ Nuevo arriendo'}
-          </button>
+          {esStaff && (
+            <button type="button" onClick={showForm ? cerrarForm : () => setShowForm(true)}>
+              {showForm ? 'Cancelar' : '+ Nuevo arriendo'}
+            </button>
+          )}
         </div>
       </div>
 
-      {showForm && (
+      {esStaff && showForm && (
         <form className="inline-form" onSubmit={handleSubmit}>
           <div className="inline-form__grid">
             <label>

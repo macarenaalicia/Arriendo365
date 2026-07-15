@@ -7,7 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegistroPage } from './pages/RegistroPage';
 import { ArriendosListPage } from './pages/ArriendosListPage';
 import { ArriendoDetailPage } from './pages/ArriendoDetailPage';
-import { PagosResumenPage } from './pages/PagosResumenPage';
+import { PagosPage } from './pages/PagosPage';
 import { PropiedadesListPage } from './pages/PropiedadesListPage';
 import { AutosListPage } from './pages/AutosListPage';
 import { PersonasListPage } from './pages/PersonasListPage';
@@ -24,7 +24,7 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<ArriendosListPage />} />
               <Route path="/arriendos/:id" element={<ArriendoDetailPage />} />
-              <Route path="/pagos" element={<PagosResumenPage />} />
+              <Route path="/pagos" element={<PagosPage />} />
               <Route element={<StaffRoute />}>
                 <Route path="/propiedades" element={<PropiedadesListPage />} />
                 <Route path="/autos" element={<AutosListPage />} />
