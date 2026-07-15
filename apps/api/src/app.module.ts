@@ -22,6 +22,7 @@ import { StorageModule } from './storage/storage.module';
 import { DocumentoModule } from './documento/documento.module';
 import { FotoModule } from './foto/foto.module';
 import { ChatModule } from './chat/chat.module';
+import { UsuarioModule } from './usuario/usuario.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ChatModule } from './chat/chat.module';
     DocumentoModule,
     FotoModule,
     ChatModule,
+    UsuarioModule,
   ],
   controllers: [AppController],
   providers: [

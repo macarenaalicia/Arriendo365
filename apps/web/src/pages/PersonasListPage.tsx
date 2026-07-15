@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
-import type { Persona } from '../api/types';
+import type { Persona, RolUsuario, Usuario } from '../api/types';
 import { ddmmyyyyToIso, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 
@@ -13,6 +13,14 @@ const FORM_INICIAL = {
   fechaNacimiento: '',
 };
 
+const ROLES: RolUsuario[] = ['ADMINISTRADOR', 'PROPIETARIO', 'ARRENDATARIO', 'TECNICO'];
+
+const ACCESO_FORM_INICIAL = {
+  rol: 'ARRENDATARIO' as RolUsuario,
+  activo: true,
+  password: '',
+};
+
 export function PersonasListPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +30,12 @@ export function PersonasListPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [accesoForm, setAccesoForm] = useState(ACCESO_FORM_INICIAL);
+  const [accesoError, setAccesoError] = useState<string | null>(null);
+  const [savingAcceso, setSavingAcceso] = useState(false);
+
   const cargar = () => {
     setLoading(true);
     api
@@ -30,7 +44,12 @@ export function PersonasListPage() {
       .finally(() => setLoading(false));
   };
 
+  const cargarUsuarios = () => {
+    api.get<Usuario[]>('/usuarios').then(setUsuarios);
+  };
+
   useEffect(cargar, []);
+  useEffect(cargarUsuarios, []);
 
   const cerrarForm = () => {
     setShowForm(false);
@@ -101,6 +120,64 @@ export function PersonasListPage() {
     if (!confirm('¿Eliminar esta persona?')) return;
     await api.delete(`/personas/${id}`);
     cargar();
+  };
+
+  const toggleAcceso = (personaId: string) => {
+    if (expandedId === personaId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(personaId);
+    setAccesoError(null);
+    const usuario = usuarios.find((u) => u.personaId === personaId);
+    setAccesoForm(
+      usuario
+        ? { rol: usuario.rol, activo: usuario.activo, password: '' }
+        : ACCESO_FORM_INICIAL,
+    );
+  };
+
+  const handleGuardarAcceso = async (personaId: string) => {
+    const usuario = usuarios.find((u) => u.personaId === personaId);
+
+    if (!usuario && !accesoForm.password) {
+      setAccesoError('Define una contraseña para crear el acceso.');
+      return;
+    }
+    if (accesoForm.password && accesoForm.password.length < 8) {
+      setAccesoError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    setAccesoError(null);
+    setSavingAcceso(true);
+    try {
+      if (usuario) {
+        await api.patch(`/usuarios/${usuario.id}`, {
+          rol: accesoForm.rol,
+          activo: accesoForm.activo,
+          password: accesoForm.password || undefined,
+        });
+      } else {
+        await api.post('/usuarios', {
+          personaId,
+          rol: accesoForm.rol,
+          password: accesoForm.password,
+        });
+      }
+      cargarUsuarios();
+      setAccesoForm({ ...accesoForm, password: '' });
+    } catch (err) {
+      setAccesoError(err instanceof ApiError ? err.message : 'No se pudo guardar el acceso');
+    } finally {
+      setSavingAcceso(false);
+    }
+  };
+
+  const handleQuitarAcceso = async (usuarioId: string) => {
+    if (!confirm('¿Quitar el acceso al sistema de esta persona?')) return;
+    await api.delete(`/usuarios/${usuarioId}`);
+    setExpandedId(null);
+    cargarUsuarios();
   };
 
   return (
@@ -186,33 +263,118 @@ export function PersonasListPage() {
                 <th>Email</th>
                 <th>Teléfono</th>
                 <th>Dirección</th>
+                <th>Acceso</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {personas.map((persona) => (
-                <tr key={persona.id}>
-                  <td>{persona.nombreCompleto}</td>
-                  <td>{persona.rut}</td>
-                  <td>{persona.email ?? ''}</td>
-                  <td>{persona.telefono ?? ''}</td>
-                  <td>{persona.direccion ?? ''}</td>
-                  <td>
-                    <div className="table__actions">
-                      <button type="button" onClick={() => abrirEdicion(persona)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => handleDelete(persona.id)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {personas.map((persona) => {
+                const usuario = usuarios.find((u) => u.personaId === persona.id);
+                return (
+                  <Fragment key={persona.id}>
+                    <tr>
+                      <td>{persona.nombreCompleto}</td>
+                      <td>{persona.rut}</td>
+                      <td>{persona.email ?? ''}</td>
+                      <td>{persona.telefono ?? ''}</td>
+                      <td>{persona.direccion ?? ''}</td>
+                      <td>
+                        {usuario ? (
+                          <span
+                            className={`badge badge--${usuario.activo ? 'activo' : 'inactivo'}`}
+                          >
+                            {usuario.rol}
+                          </span>
+                        ) : (
+                          <span className="empty-state">Sin acceso</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="table__actions">
+                          <button type="button" onClick={() => abrirEdicion(persona)}>
+                            Editar
+                          </button>
+                          <button type="button" onClick={() => toggleAcceso(persona.id)}>
+                            {expandedId === persona.id ? 'Ocultar' : 'Acceso'}
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => handleDelete(persona.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {expandedId === persona.id && (
+                      <tr>
+                        <td colSpan={7}>
+                          <div className="proveedores-panel">
+                            {accesoError && <p className="auth-card__error">{accesoError}</p>}
+                            <div className="proveedores-panel__add">
+                              <select
+                                value={accesoForm.rol}
+                                onChange={(e) =>
+                                  setAccesoForm({
+                                    ...accesoForm,
+                                    rol: e.target.value as RolUsuario,
+                                  })
+                                }
+                              >
+                                {ROLES.map((rol) => (
+                                  <option key={rol} value={rol}>
+                                    {rol}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="password"
+                                placeholder={
+                                  usuario ? 'Nueva contraseña (opcional)' : 'Contraseña'
+                                }
+                                value={accesoForm.password}
+                                onChange={(e) =>
+                                  setAccesoForm({ ...accesoForm, password: e.target.value })
+                                }
+                              />
+                              {usuario && (
+                                <label className="checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={accesoForm.activo}
+                                    onChange={(e) =>
+                                      setAccesoForm({ ...accesoForm, activo: e.target.checked })
+                                    }
+                                  />
+                                  Activo
+                                </label>
+                              )}
+                              <button
+                                type="button"
+                                disabled={savingAcceso}
+                                onClick={() => handleGuardarAcceso(persona.id)}
+                              >
+                                {usuario ? 'Guardar cambios' : 'Crear acceso'}
+                              </button>
+                              {usuario && (
+                                <button
+                                  type="button"
+                                  className="danger danger--small"
+                                  onClick={() => handleQuitarAcceso(usuario.id)}
+                                >
+                                  Quitar acceso
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

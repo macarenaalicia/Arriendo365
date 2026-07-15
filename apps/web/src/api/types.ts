@@ -70,6 +70,13 @@ export interface Persona {
   fechaNacimiento: string | null;
 }
 
+export interface Usuario {
+  id: string;
+  personaId: string;
+  rol: RolUsuario;
+  activo: boolean;
+}
+
 export interface ConfiguracionMantencion {
   id: string;
   tipo: string;
