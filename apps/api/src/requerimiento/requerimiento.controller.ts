@@ -10,10 +10,12 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { RequerimientoService } from './requerimiento.service';
 import { CreateRequerimientoDto } from './dto/create-requerimiento.dto';
 import { UpdateRequerimientoDto } from './dto/update-requerimiento.dto';
 import { FindRequerimientosDto } from './dto/find-requerimientos.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('requerimientos')
 export class RequerimientoController {
@@ -34,11 +36,13 @@ export class RequerimientoController {
     return this.requerimientoService.findOne(id);
   }
 
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateRequerimientoDto) {
     return this.requerimientoService.update(id, dto);
   }
 
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {

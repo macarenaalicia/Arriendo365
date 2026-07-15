@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { ProveedorService } from './proveedor.service';
 import { CreateProveedorDto } from './dto/create-proveedor.dto';
 import { UpdateProveedorDto } from './dto/update-proveedor.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('propiedades/:propiedadId/proveedores')
 export class ProveedorController {
   constructor(private readonly proveedorService: ProveedorService) {}

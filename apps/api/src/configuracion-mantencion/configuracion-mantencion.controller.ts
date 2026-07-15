@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { ConfiguracionMantencionService } from './configuracion-mantencion.service';
 import { CreateConfiguracionMantencionDto } from './dto/create-configuracion-mantencion.dto';
 import { UpdateConfiguracionMantencionDto } from './dto/update-configuracion-mantencion.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('configuraciones-mantencion')
 export class ConfiguracionMantencionController {
   constructor(private readonly configuracionMantencionService: ConfiguracionMantencionService) {}

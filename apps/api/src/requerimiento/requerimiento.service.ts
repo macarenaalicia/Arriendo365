@@ -21,11 +21,22 @@ export class RequerimientoService {
 
   private async assertArriendoPropiedadEnOrganizacion(arriendoPropiedadId: string) {
     const arriendo = await this.prisma.arriendoPropiedad.findFirst({
-      where: { id: arriendoPropiedadId, propiedad: { organizacionId: this.tenant.organizacionId } },
+      where: {
+        id: arriendoPropiedadId,
+        propiedad: { organizacionId: this.tenant.organizacionId },
+        ...this.filtroPropio,
+      },
     });
     if (!arriendo) {
       throw new NotFoundException('Arriendo de propiedad no encontrado');
     }
+  }
+
+  private get filtroPropio() {
+    if (!this.tenant.esArrendatario) return {};
+    return {
+      OR: [{ arrendatarioId: this.tenant.personaId }, { codeudorId: this.tenant.personaId }],
+    };
   }
 
   private async assertPersonaEnOrganizacion(personaId: string) {
@@ -60,6 +71,7 @@ export class RequerimientoService {
         arriendoPropiedad: {
           id: query.arriendoPropiedadId,
           propiedad: { organizacionId: this.tenant.organizacionId },
+          ...this.filtroPropio,
         },
         estado: query.estado,
         urgencia: query.urgencia,
@@ -73,7 +85,10 @@ export class RequerimientoService {
     const requerimiento = await this.prisma.requerimiento.findFirst({
       where: {
         id,
-        arriendoPropiedad: { propiedad: { organizacionId: this.tenant.organizacionId } },
+        arriendoPropiedad: {
+          propiedad: { organizacionId: this.tenant.organizacionId },
+          ...this.filtroPropio,
+        },
       },
       include: DETALLE_INCLUDE,
     });

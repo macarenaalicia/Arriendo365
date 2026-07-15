@@ -49,11 +49,19 @@ export class ArriendoPropiedadService {
     });
   }
 
+  private get filtroPropio() {
+    if (!this.tenant.esArrendatario) return {};
+    return {
+      OR: [{ arrendatarioId: this.tenant.personaId }, { codeudorId: this.tenant.personaId }],
+    };
+  }
+
   findAll(query: FindArriendosPropiedadDto) {
     return this.prisma.arriendoPropiedad.findMany({
       where: {
         propiedad: { organizacionId: this.tenant.organizacionId },
         estado: query.estado,
+        ...this.filtroPropio,
       },
       include: DETALLE_INCLUDE,
       orderBy: { createdAt: 'desc' },
@@ -62,7 +70,11 @@ export class ArriendoPropiedadService {
 
   async findOne(id: string) {
     const arriendo = await this.prisma.arriendoPropiedad.findFirst({
-      where: { id, propiedad: { organizacionId: this.tenant.organizacionId } },
+      where: {
+        id,
+        propiedad: { organizacionId: this.tenant.organizacionId },
+        ...this.filtroPropio,
+      },
       include: { ...DETALLE_INCLUDE, inventario: true, requerimientos: true },
     });
 

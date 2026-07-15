@@ -1,7 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { R2Service } from './r2.service';
 import { CrearUrlSubidaDto } from './dto/crear-url-subida.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('storage')
 export class StorageController {
   constructor(private readonly r2Service: R2Service) {}

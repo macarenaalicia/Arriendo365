@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { GastoService } from './gasto.service';
 import { CreateGastoDto } from './dto/create-gasto.dto';
 import { UpdateGastoDto } from './dto/update-gasto.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('requerimientos/:requerimientoId/gastos')
 export class GastoController {
   constructor(private readonly gastoService: GastoService) {}

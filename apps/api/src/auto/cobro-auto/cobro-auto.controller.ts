@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { CobroAutoService } from './cobro-auto.service';
 import { CreateCobroAutoDto } from './dto/create-cobro-auto.dto';
 import { UpdateCobroAutoDto } from './dto/update-cobro-auto.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('autos/:autoId/cobros')
 export class CobroAutoController {
   constructor(private readonly cobroAutoService: CobroAutoService) {}

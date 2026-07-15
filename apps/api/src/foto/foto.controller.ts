@@ -1,8 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { FotoService } from './foto.service';
 import { CreateFotoDto } from './dto/create-foto.dto';
 import { FindFotosDto } from './dto/find-fotos.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('fotos')
 export class FotoController {
   constructor(private readonly fotoService: FotoService) {}

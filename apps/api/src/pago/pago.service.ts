@@ -16,10 +16,25 @@ export class PagoService {
   private async assertArriendoEnOrganizacion(arriendoTipo: ArriendoTipo, arriendoId: string) {
     const organizacionId = this.tenant.organizacionId;
 
+    if (this.tenant.esArrendatario && arriendoTipo === 'auto') {
+      throw new NotFoundException('Arriendo no encontrado');
+    }
+
     const existe =
       arriendoTipo === 'propiedad'
         ? await this.prisma.arriendoPropiedad.findFirst({
-            where: { id: arriendoId, propiedad: { organizacionId } },
+            where: {
+              id: arriendoId,
+              propiedad: { organizacionId },
+              ...(this.tenant.esArrendatario
+                ? {
+                    OR: [
+                      { arrendatarioId: this.tenant.personaId },
+                      { codeudorId: this.tenant.personaId },
+                    ],
+                  }
+                : {}),
+            },
           })
         : await this.prisma.arriendoAuto.findFirst({
             where: { id: arriendoId, auto: { organizacionId } },
@@ -35,6 +50,20 @@ export class PagoService {
     autoIds: string[];
   }> {
     const organizacionId = this.tenant.organizacionId;
+
+    if (this.tenant.esArrendatario) {
+      const arriendosPropiedad = await this.prisma.arriendoPropiedad.findMany({
+        where: {
+          propiedad: { organizacionId },
+          OR: [
+            { arrendatarioId: this.tenant.personaId },
+            { codeudorId: this.tenant.personaId },
+          ],
+        },
+        select: { id: true },
+      });
+      return { propiedadIds: arriendosPropiedad.map((a) => a.id), autoIds: [] };
+    }
 
     const [arriendosPropiedad, arriendosAuto] = await Promise.all([
       this.prisma.arriendoPropiedad.findMany({

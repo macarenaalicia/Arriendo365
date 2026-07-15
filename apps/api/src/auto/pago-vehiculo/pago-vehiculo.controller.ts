@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { PagoVehiculoService } from './pago-vehiculo.service';
 import { CreatePagoVehiculoDto } from './dto/create-pago-vehiculo.dto';
 import { UpdatePagoVehiculoDto } from './dto/update-pago-vehiculo.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('autos/:autoId/pagos-vehiculo')
 export class PagoVehiculoController {
   constructor(private readonly pagoVehiculoService: PagoVehiculoService) {}

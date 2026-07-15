@@ -35,4 +35,8 @@ export class TenantContextService {
   get rol(): RolUsuario {
     return this.cls.get('rol');
   }
+
+  get esArrendatario(): boolean {
+    return this.rol === RolUsuario.ARRENDATARIO;
+  }
 }

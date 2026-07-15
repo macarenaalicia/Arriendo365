@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { MantencionAutoService } from './mantencion-auto.service';
 import { CreateMantencionAutoDto } from './dto/create-mantencion-auto.dto';
 import { UpdateMantencionAutoDto } from './dto/update-mantencion-auto.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('autos/:autoId/mantenciones')
 export class MantencionAutoController {
   constructor(private readonly mantencionAutoService: MantencionAutoService) {}

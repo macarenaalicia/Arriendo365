@@ -10,10 +10,12 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { PagoService } from './pago.service';
 import { CreatePagoDto } from './dto/create-pago.dto';
 import { UpdatePagoDto } from './dto/update-pago.dto';
 import { FindPagosDto } from './dto/find-pagos.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('pagos')
 export class PagoController {
@@ -39,11 +41,13 @@ export class PagoController {
     return this.pagoService.findOne(id);
   }
 
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdatePagoDto) {
     return this.pagoService.update(id, dto);
   }
 
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {

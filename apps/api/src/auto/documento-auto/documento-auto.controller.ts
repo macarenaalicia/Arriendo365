@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { DocumentoAutoService } from './documento-auto.service';
 import { CreateDocumentoAutoDto } from './dto/create-documento-auto.dto';
 import { UpdateDocumentoAutoDto } from './dto/update-documento-auto.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
 
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
 @Controller('autos/:autoId/documentos')
 export class DocumentoAutoController {
   constructor(private readonly documentoAutoService: DocumentoAutoService) {}
