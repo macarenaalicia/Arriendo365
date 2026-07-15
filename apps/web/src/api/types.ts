@@ -142,3 +142,28 @@ export interface ResumenPagos {
   porEstado: Record<EstadoPago, { cantidad: number; montoTotal: number }>;
   montoTotalGeneral: number;
 }
+
+export type UrgenciaRequerimiento = 'CRITICA' | 'MEDIA' | 'BAJA';
+
+export type EstadoRequerimiento =
+  | 'PENDIENTE_REVISION'
+  | 'REVISION_AGENDADA'
+  | 'EN_REVISION'
+  | 'RESUELTO';
+
+export type TipoReparacion = 'ESTRUCTURAL' | 'LOCATIVA';
+
+export interface Requerimiento {
+  id: string;
+  arriendoPropiedadId: string;
+  urgencia: UrgenciaRequerimiento;
+  estado: EstadoRequerimiento;
+  tecnicoId: string | null;
+  tecnico: Persona | null;
+  tipoReparacion: TipoReparacion;
+  detalleResolucion: string | null;
+  notasInternas: string | null;
+  notasArrendatario: string | null;
+  fechaComprometida: string | null;
+  fechaSolucion: string | null;
+}

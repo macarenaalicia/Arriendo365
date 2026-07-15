@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { StaffRoute } from './auth/StaffRoute';
 import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { RegistroPage } from './pages/RegistroPage';
@@ -24,9 +25,11 @@ function App() {
               <Route path="/" element={<ArriendosListPage />} />
               <Route path="/arriendos/:id" element={<ArriendoDetailPage />} />
               <Route path="/pagos" element={<PagosResumenPage />} />
-              <Route path="/propiedades" element={<PropiedadesListPage />} />
-              <Route path="/autos" element={<AutosListPage />} />
-              <Route path="/personas" element={<PersonasListPage />} />
+              <Route element={<StaffRoute />}>
+                <Route path="/propiedades" element={<PropiedadesListPage />} />
+                <Route path="/autos" element={<AutosListPage />} />
+                <Route path="/personas" element={<PersonasListPage />} />
+              </Route>
             </Route>
           </Route>
 

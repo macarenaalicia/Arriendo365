@@ -2,8 +2,9 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 export function Layout() {
-  const { logout } = useAuth();
+  const { logout, rol } = useAuth();
   const navigate = useNavigate();
+  const esArrendatario = rol === 'ARRENDATARIO';
 
   const handleLogout = () => {
     logout();
@@ -18,9 +19,9 @@ export function Layout() {
           <NavLink to="/" end>
             Arriendos
           </NavLink>
-          <NavLink to="/propiedades">Propiedades</NavLink>
-          <NavLink to="/autos">Autos</NavLink>
-          <NavLink to="/personas">Personas</NavLink>
+          {!esArrendatario && <NavLink to="/propiedades">Propiedades</NavLink>}
+          {!esArrendatario && <NavLink to="/autos">Autos</NavLink>}
+          {!esArrendatario && <NavLink to="/personas">Personas</NavLink>}
           <NavLink to="/pagos">Pagos</NavLink>
         </nav>
         <button type="button" onClick={handleLogout} className="layout__logout">

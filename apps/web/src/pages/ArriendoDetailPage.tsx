@@ -1,11 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
-import type { ArriendoPropiedad, EstadoPago, Pago } from '../api/types';
+import { useAuth } from '../auth/AuthContext';
+import type {
+  ArriendoPropiedad,
+  EstadoPago,
+  EstadoRequerimiento,
+  Pago,
+  Persona,
+  Requerimiento,
+  TipoReparacion,
+  UrgenciaRequerimiento,
+} from '../api/types';
 import { ddmmyyyyToIso, formatFecha, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 
 const ESTADOS_PAGO: EstadoPago[] = ['PENDIENTE', 'PAGADO', 'ATRASADO', 'RECHAZADO'];
+const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
+const TIPOS_REPARACION: TipoReparacion[] = ['LOCATIVA', 'ESTRUCTURAL'];
+const ESTADOS_REQUERIMIENTO: EstadoRequerimiento[] = [
+  'PENDIENTE_REVISION',
+  'REVISION_AGENDADA',
+  'EN_REVISION',
+  'RESUELTO',
+];
 
 const PAGO_FORM_INICIAL = {
   periodo: '',
@@ -13,6 +31,15 @@ const PAGO_FORM_INICIAL = {
   monto: '',
   medioPago: '',
   estado: 'PENDIENTE' as EstadoPago,
+};
+
+const REQ_FORM_INICIAL = {
+  urgencia: 'MEDIA' as UrgenciaRequerimiento,
+  tipoReparacion: 'LOCATIVA' as TipoReparacion,
+  notasArrendatario: '',
+  estado: 'PENDIENTE_REVISION' as EstadoRequerimiento,
+  tecnicoId: '',
+  detalleResolucion: '',
 };
 
 function formatMonto(monto: string | number) {
@@ -23,6 +50,9 @@ function formatMonto(monto: string | number) {
 
 export function ArriendoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { rol } = useAuth();
+  const esStaff = rol !== 'ARRENDATARIO';
+
   const [arriendo, setArriendo] = useState<ArriendoPropiedad | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,9 +64,22 @@ export function ArriendoDetailPage() {
   const [pagoError, setPagoError] = useState<string | null>(null);
   const [savingPago, setSavingPago] = useState(false);
 
+  const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [showReqForm, setShowReqForm] = useState(false);
+  const [editingReqId, setEditingReqId] = useState<string | null>(null);
+  const [reqForm, setReqForm] = useState(REQ_FORM_INICIAL);
+  const [reqError, setReqError] = useState<string | null>(null);
+  const [savingReq, setSavingReq] = useState(false);
+
   const cargarPagos = () => {
     if (!id) return;
     api.get<Pago[]>(`/pagos?arriendoTipo=propiedad&arriendoId=${id}`).then(setPagos);
+  };
+
+  const cargarRequerimientos = () => {
+    if (!id) return;
+    api.get<Requerimiento[]>(`/requerimientos?arriendoPropiedadId=${id}`).then(setRequerimientos);
   };
 
   useEffect(() => {
@@ -47,14 +90,22 @@ export function ArriendoDetailPage() {
     Promise.all([
       api.get<ArriendoPropiedad>(`/arriendos-propiedad/${id}`),
       api.get<Pago[]>(`/pagos?arriendoTipo=propiedad&arriendoId=${id}`),
+      api.get<Requerimiento[]>(`/requerimientos?arriendoPropiedadId=${id}`),
     ])
-      .then(([arriendoData, pagosData]) => {
+      .then(([arriendoData, pagosData, requerimientosData]) => {
         setArriendo(arriendoData);
         setPagos(pagosData);
+        setRequerimientos(requerimientosData);
       })
       .catch(() => setError('No se pudo cargar el detalle del arriendo'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (esStaff) {
+      api.get<Persona[]>('/personas').then(setPersonas);
+    }
+  }, [esStaff]);
 
   const cerrarPagoForm = () => {
     setShowPagoForm(false);
@@ -124,6 +175,71 @@ export function ArriendoDetailPage() {
     await api.delete(`/pagos/${pagoId}`);
     if (editingPagoId === pagoId) cerrarPagoForm();
     setPagos((prev) => prev.filter((p) => p.id !== pagoId));
+  };
+
+  const cerrarReqForm = () => {
+    setShowReqForm(false);
+    setEditingReqId(null);
+    setReqForm(REQ_FORM_INICIAL);
+    setReqError(null);
+  };
+
+  const abrirCreacionReq = () => {
+    setReqForm(REQ_FORM_INICIAL);
+    setEditingReqId(null);
+    setShowReqForm(true);
+  };
+
+  const abrirEdicionReq = (req: Requerimiento) => {
+    setReqForm({
+      urgencia: req.urgencia,
+      tipoReparacion: req.tipoReparacion,
+      notasArrendatario: req.notasArrendatario ?? '',
+      estado: req.estado,
+      tecnicoId: req.tecnicoId ?? '',
+      detalleResolucion: req.detalleResolucion ?? '',
+    });
+    setEditingReqId(req.id);
+    setShowReqForm(true);
+  };
+
+  const handleSubmitReq = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setReqError(null);
+    setSavingReq(true);
+    try {
+      if (editingReqId) {
+        await api.patch(`/requerimientos/${editingReqId}`, {
+          urgencia: reqForm.urgencia,
+          tipoReparacion: reqForm.tipoReparacion,
+          notasArrendatario: reqForm.notasArrendatario || undefined,
+          estado: reqForm.estado,
+          tecnicoId: reqForm.tecnicoId || undefined,
+          detalleResolucion: reqForm.detalleResolucion || undefined,
+        });
+      } else {
+        await api.post('/requerimientos', {
+          arriendoPropiedadId: id,
+          urgencia: reqForm.urgencia,
+          tipoReparacion: reqForm.tipoReparacion,
+          notasArrendatario: reqForm.notasArrendatario || undefined,
+        });
+      }
+
+      cerrarReqForm();
+      cargarRequerimientos();
+    } catch (err) {
+      setReqError(err instanceof ApiError ? err.message : 'No se pudo guardar el requerimiento');
+    } finally {
+      setSavingReq(false);
+    }
+  };
+
+  const handleDeleteReq = async (reqId: string) => {
+    if (!confirm('¿Eliminar este requerimiento?')) return;
+    await api.delete(`/requerimientos/${reqId}`);
+    if (editingReqId === reqId) cerrarReqForm();
+    setRequerimientos((prev) => prev.filter((r) => r.id !== reqId));
   };
 
   if (loading) return <p>Cargando…</p>;
@@ -251,7 +367,7 @@ export function ArriendoDetailPage() {
                   <th>Comprometido</th>
                   <th>Monto</th>
                   <th>Estado</th>
-                  <th>Acciones</th>
+                  {esStaff && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -265,20 +381,182 @@ export function ArriendoDetailPage() {
                         {pago.estado}
                       </span>
                     </td>
+                    {esStaff && (
+                      <td>
+                        <div className="table__actions">
+                          <button type="button" onClick={() => abrirEdicionPago(pago)}>
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => handleDeletePago(pago.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="page-header">
+          <h2>Requerimientos</h2>
+          <button type="button" onClick={showReqForm ? cerrarReqForm : abrirCreacionReq}>
+            {showReqForm ? 'Cancelar' : '+ Reportar requerimiento'}
+          </button>
+        </div>
+
+        {showReqForm && (
+          <form className="inline-form" onSubmit={handleSubmitReq}>
+            <div className="inline-form__grid">
+              <label>
+                Urgencia
+                <select
+                  value={reqForm.urgencia}
+                  onChange={(e) =>
+                    setReqForm({ ...reqForm, urgencia: e.target.value as UrgenciaRequerimiento })
+                  }
+                >
+                  {URGENCIAS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Tipo de reparación
+                <select
+                  value={reqForm.tipoReparacion}
+                  onChange={(e) =>
+                    setReqForm({ ...reqForm, tipoReparacion: e.target.value as TipoReparacion })
+                  }
+                >
+                  {TIPOS_REPARACION.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {editingReqId && esStaff && (
+                <>
+                  <label>
+                    Estado
+                    <select
+                      value={reqForm.estado}
+                      onChange={(e) =>
+                        setReqForm({
+                          ...reqForm,
+                          estado: e.target.value as EstadoRequerimiento,
+                        })
+                      }
+                    >
+                      {ESTADOS_REQUERIMIENTO.map((estado) => (
+                        <option key={estado} value={estado}>
+                          {estado}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Técnico asignado
+                    <select
+                      value={reqForm.tecnicoId}
+                      onChange={(e) => setReqForm({ ...reqForm, tecnicoId: e.target.value })}
+                    >
+                      <option value="">Sin asignar</option>
+                      {personas.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombreCompleto}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+            </div>
+
+            <label>
+              Descripción
+              <textarea
+                placeholder="Describe el problema…"
+                value={reqForm.notasArrendatario}
+                onChange={(e) => setReqForm({ ...reqForm, notasArrendatario: e.target.value })}
+              />
+            </label>
+
+            {editingReqId && esStaff && (
+              <label>
+                Detalle de resolución
+                <textarea
+                  value={reqForm.detalleResolucion}
+                  onChange={(e) =>
+                    setReqForm({ ...reqForm, detalleResolucion: e.target.value })
+                  }
+                />
+              </label>
+            )}
+
+            {reqError && <p className="auth-card__error">{reqError}</p>}
+
+            <button type="submit" disabled={savingReq}>
+              {savingReq ? 'Guardando…' : editingReqId ? 'Guardar cambios' : 'Reportar'}
+            </button>
+          </form>
+        )}
+
+        {requerimientos.length === 0 && (
+          <p className="empty-state">Sin requerimientos registrados.</p>
+        )}
+        {requerimientos.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Urgencia</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                  <th>Técnico</th>
+                  <th>Descripción</th>
+                  {esStaff && <th>Acciones</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {requerimientos.map((req) => (
+                  <tr key={req.id}>
                     <td>
-                      <div className="table__actions">
-                        <button type="button" onClick={() => abrirEdicionPago(pago)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => handleDeletePago(pago.id)}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
+                      <span className={`badge badge--${req.urgencia.toLowerCase()}`}>
+                        {req.urgencia}
+                      </span>
                     </td>
+                    <td>{req.tipoReparacion}</td>
+                    <td>{req.estado.replace(/_/g, ' ')}</td>
+                    <td>{req.tecnico?.nombreCompleto ?? ''}</td>
+                    <td>{req.notasArrendatario ?? ''}</td>
+                    {esStaff && (
+                      <td>
+                        <div className="table__actions">
+                          <button type="button" onClick={() => abrirEdicionReq(req)}>
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => handleDeleteReq(req.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
