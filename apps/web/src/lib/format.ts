@@ -29,3 +29,10 @@ export function maskFechaDDMMYYYY(raw: string): string {
   const partes = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean);
   return partes.join('/');
 }
+
+export function hoyDdmmyyyy(): string {
+  const hoy = new Date();
+  const dd = String(hoy.getDate()).padStart(2, '0');
+  const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${hoy.getFullYear()}`;
+}

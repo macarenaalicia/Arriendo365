@@ -12,8 +12,15 @@ import type {
   TipoReparacion,
   UrgenciaRequerimiento,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, isoToDdmmyyyy } from '../lib/format';
+import { ddmmyyyyToIso, formatFecha, hoyDdmmyyyy, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
+import {
+  MEDIOS_PAGO,
+  asegurarOpcion,
+  generarOpcionesPeriodo,
+  periodoValorAFecha,
+  type OpcionPeriodo,
+} from '../lib/periodos';
 
 const ESTADOS_PAGO: EstadoPago[] = ['PENDIENTE', 'PAGADO', 'ATRASADO', 'RECHAZADO'];
 const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
@@ -27,9 +34,10 @@ const ESTADOS_REQUERIMIENTO: EstadoRequerimiento[] = [
 
 const PAGO_FORM_INICIAL = {
   periodo: '',
-  fechaComprometida: '',
+  periodoPago: '',
   monto: '',
   medioPago: '',
+  tipoPago: 'completo' as 'completo' | 'abono',
   estado: 'PENDIENTE' as EstadoPago,
 };
 
@@ -61,6 +69,7 @@ export function ArriendoDetailPage() {
   const [showPagoForm, setShowPagoForm] = useState(false);
   const [editingPagoId, setEditingPagoId] = useState<string | null>(null);
   const [pagoForm, setPagoForm] = useState(PAGO_FORM_INICIAL);
+  const [opcionesPeriodo, setOpcionesPeriodo] = useState<OpcionPeriodo[]>([]);
   const [pagoError, setPagoError] = useState<string | null>(null);
   const [savingPago, setSavingPago] = useState(false);
 
@@ -115,17 +124,28 @@ export function ArriendoDetailPage() {
   };
 
   const abrirCreacionPago = () => {
-    setPagoForm(PAGO_FORM_INICIAL);
+    const { opciones, proximoValue } = generarOpcionesPeriodo(pagos);
+    setOpcionesPeriodo(opciones);
+    setPagoForm({
+      ...PAGO_FORM_INICIAL,
+      periodo: hoyDdmmyyyy(),
+      periodoPago: proximoValue,
+      monto: arriendo ? arriendo.montoArriendo : '',
+    });
     setEditingPagoId(null);
     setShowPagoForm(true);
   };
 
   const abrirEdicionPago = (pago: Pago) => {
+    const { opciones } = generarOpcionesPeriodo(pagos);
+    const valorMes = pago.fechaComprometida.slice(0, 7);
+    setOpcionesPeriodo(asegurarOpcion(opciones, valorMes));
     setPagoForm({
       periodo: isoToDdmmyyyy(pago.periodo),
-      fechaComprometida: isoToDdmmyyyy(pago.fechaComprometida),
+      periodoPago: valorMes,
       monto: pago.monto,
       medioPago: pago.medioPago ?? '',
+      tipoPago: pago.esAbono ? 'abono' : 'completo',
       estado: pago.estado,
     });
     setEditingPagoId(pago.id);
@@ -137,11 +157,20 @@ export function ArriendoDetailPage() {
     setPagoError(null);
 
     const periodo = ddmmyyyyToIso(pagoForm.periodo);
-    const fechaComprometida = ddmmyyyyToIso(pagoForm.fechaComprometida);
-    if (!periodo || !fechaComprometida) {
-      setPagoError('Revisa las fechas, deben tener el formato dd/mm/aaaa.');
+    if (!periodo) {
+      setPagoError('La fecha de pago debe tener el formato dd/mm/aaaa.');
       return;
     }
+    if (!pagoForm.periodoPago) {
+      setPagoError('Elige el periodo de pago.');
+      return;
+    }
+    if (!pagoForm.medioPago) {
+      setPagoError('Elige el medio de pago.');
+      return;
+    }
+
+    const fechaComprometida = periodoValorAFecha(pagoForm.periodoPago, arriendo?.fechaPago ?? 1);
 
     setSavingPago(true);
     try {
@@ -151,7 +180,8 @@ export function ArriendoDetailPage() {
         periodo,
         fechaComprometida,
         monto: Number(pagoForm.monto),
-        medioPago: pagoForm.medioPago || undefined,
+        medioPago: pagoForm.medioPago,
+        esAbono: pagoForm.tipoPago === 'abono',
         estado: pagoForm.estado,
       };
 
@@ -299,7 +329,7 @@ export function ArriendoDetailPage() {
           <form className="inline-form" onSubmit={handleSubmitPago}>
             <div className="inline-form__grid">
               <label>
-                Periodo
+                Fecha de pago
                 <DateInput
                   value={pagoForm.periodo}
                   onChange={(value) => setPagoForm({ ...pagoForm, periodo: value })}
@@ -307,12 +337,35 @@ export function ArriendoDetailPage() {
                 />
               </label>
               <label>
-                Fecha comprometida
-                <DateInput
-                  value={pagoForm.fechaComprometida}
-                  onChange={(value) => setPagoForm({ ...pagoForm, fechaComprometida: value })}
+                Periodo de pago
+                <select
                   required
-                />
+                  value={pagoForm.periodoPago}
+                  onChange={(e) => setPagoForm({ ...pagoForm, periodoPago: e.target.value })}
+                >
+                  {opcionesPeriodo.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Tipo de pago
+                <select
+                  value={pagoForm.tipoPago}
+                  onChange={(e) => {
+                    const tipoPago = e.target.value as 'completo' | 'abono';
+                    setPagoForm({
+                      ...pagoForm,
+                      tipoPago,
+                      monto: tipoPago === 'completo' && arriendo ? arriendo.montoArriendo : pagoForm.monto,
+                    });
+                  }}
+                >
+                  <option value="completo">Pago completo</option>
+                  <option value="abono">Abono</option>
+                </select>
               </label>
               <label>
                 Monto
@@ -320,17 +373,25 @@ export function ArriendoDetailPage() {
                   type="number"
                   min={0}
                   required
+                  disabled={pagoForm.tipoPago === 'completo'}
                   value={pagoForm.monto}
                   onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })}
                 />
               </label>
               <label>
                 Medio de pago
-                <input
-                  placeholder="ej. Transferencia"
+                <select
+                  required
                   value={pagoForm.medioPago}
                   onChange={(e) => setPagoForm({ ...pagoForm, medioPago: e.target.value })}
-                />
+                >
+                  <option value="">Selecciona…</option>
+                  {MEDIOS_PAGO.map((medio) => (
+                    <option key={medio} value={medio}>
+                      {medio}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Estado
@@ -363,9 +424,10 @@ export function ArriendoDetailPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Periodo</th>
-                  <th>Comprometido</th>
+                  <th>Fecha de pago</th>
+                  <th>Periodo de pago</th>
                   <th>Monto</th>
+                  <th>Tipo</th>
                   <th>Estado</th>
                   {esStaff && <th>Acciones</th>}
                 </tr>
@@ -376,6 +438,7 @@ export function ArriendoDetailPage() {
                     <td>{formatFecha(pago.periodo)}</td>
                     <td>{formatFecha(pago.fechaComprometida)}</td>
                     <td>{formatMonto(pago.monto)}</td>
+                    <td>{pago.esAbono ? 'Abono' : 'Completo'}</td>
                     <td>
                       <span className={`badge badge--${pago.estado.toLowerCase()}`}>
                         {pago.estado}

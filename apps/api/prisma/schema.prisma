@@ -323,6 +323,7 @@ model Pago {
   fechaPagoReal     DateTime?
   monto             Decimal    @db.Decimal(10, 2)
   medioPago         String?
+  esAbono           Boolean    @default(false)
   estado            EstadoPago @default(PENDIENTE)
   comprobanteFotoId String?
   aprobado          Boolean?

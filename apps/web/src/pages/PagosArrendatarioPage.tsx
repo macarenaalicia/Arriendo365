@@ -2,14 +2,21 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { ArriendoPropiedad, EstadoPago, Pago } from '../api/types';
-import { ddmmyyyyToIso, formatFecha } from '../lib/format';
+import { ddmmyyyyToIso, formatFecha, hoyDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
+import {
+  MEDIOS_PAGO,
+  generarOpcionesPeriodo,
+  periodoValorAFecha,
+  type OpcionPeriodo,
+} from '../lib/periodos';
 
 const PAGO_FORM_INICIAL = {
   periodo: '',
-  fechaComprometida: '',
+  periodoPago: '',
   monto: '',
   medioPago: '',
+  tipoPago: 'completo' as 'completo' | 'abono',
 };
 
 function formatMonto(monto: string | number) {
@@ -27,6 +34,7 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(PAGO_FORM_INICIAL);
+  const [opcionesPeriodo, setOpcionesPeriodo] = useState<OpcionPeriodo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -49,16 +57,37 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
     .filter((p) => p.estado === 'PENDIENTE' || p.estado === 'ATRASADO')
     .reduce((acc, p) => acc + Number(p.monto), 0);
 
+  const abrirFormulario = () => {
+    const { opciones, proximoValue } = generarOpcionesPeriodo(pagos);
+    setOpcionesPeriodo(opciones);
+    setForm({
+      ...PAGO_FORM_INICIAL,
+      periodo: hoyDdmmyyyy(),
+      periodoPago: proximoValue,
+      monto: arriendo.montoArriendo,
+    });
+    setShowForm(true);
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
 
     const periodo = ddmmyyyyToIso(form.periodo);
-    const fechaComprometida = ddmmyyyyToIso(form.fechaComprometida);
-    if (!periodo || !fechaComprometida) {
-      setError('Revisa las fechas, deben tener el formato dd/mm/aaaa.');
+    if (!periodo) {
+      setError('La fecha de pago debe tener el formato dd/mm/aaaa.');
       return;
     }
+    if (!form.periodoPago) {
+      setError('Elige el periodo de pago.');
+      return;
+    }
+    if (!form.medioPago) {
+      setError('Elige el medio de pago.');
+      return;
+    }
+
+    const fechaComprometida = periodoValorAFecha(form.periodoPago, arriendo.fechaPago);
 
     setSaving(true);
     try {
@@ -68,7 +97,8 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
         periodo,
         fechaComprometida,
         monto: Number(form.monto),
-        medioPago: form.medioPago || undefined,
+        medioPago: form.medioPago,
+        esAbono: form.tipoPago === 'abono',
       });
       setForm(PAGO_FORM_INICIAL);
       setShowForm(false);
@@ -100,7 +130,9 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
               </span>
               <span className="stat-card__count">
                 {ultimoPago
-                  ? `${formatFecha(ultimoPago.periodo)} · ${ultimoPago.estado}`
+                  ? `${formatFecha(ultimoPago.periodo)} · ${ultimoPago.estado}${
+                      ultimoPago.esAbono ? ' · Abono' : ''
+                    }`
                   : 'Sin pagos aún'}
               </span>
             </div>
@@ -116,7 +148,10 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
 
           <div className="page-header">
             <span />
-            <button type="button" onClick={() => setShowForm((v) => !v)}>
+            <button
+              type="button"
+              onClick={() => (showForm ? setShowForm(false) : abrirFormulario())}
+            >
               {showForm ? 'Cancelar' : '+ Registrar pago'}
             </button>
           </div>
@@ -125,7 +160,7 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
             <form className="inline-form" onSubmit={handleSubmit}>
               <div className="inline-form__grid">
                 <label>
-                  Periodo
+                  Fecha de pago
                   <DateInput
                     value={form.periodo}
                     onChange={(value) => setForm({ ...form, periodo: value })}
@@ -133,12 +168,35 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
                   />
                 </label>
                 <label>
-                  Fecha comprometida
-                  <DateInput
-                    value={form.fechaComprometida}
-                    onChange={(value) => setForm({ ...form, fechaComprometida: value })}
+                  Periodo de pago
+                  <select
                     required
-                  />
+                    value={form.periodoPago}
+                    onChange={(e) => setForm({ ...form, periodoPago: e.target.value })}
+                  >
+                    {opcionesPeriodo.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Tipo de pago
+                  <select
+                    value={form.tipoPago}
+                    onChange={(e) => {
+                      const tipoPago = e.target.value as 'completo' | 'abono';
+                      setForm({
+                        ...form,
+                        tipoPago,
+                        monto: tipoPago === 'completo' ? arriendo.montoArriendo : form.monto,
+                      });
+                    }}
+                  >
+                    <option value="completo">Pago completo</option>
+                    <option value="abono">Abono</option>
+                  </select>
                 </label>
                 <label>
                   Monto
@@ -146,17 +204,25 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
                     type="number"
                     min={0}
                     required
+                    disabled={form.tipoPago === 'completo'}
                     value={form.monto}
                     onChange={(e) => setForm({ ...form, monto: e.target.value })}
                   />
                 </label>
                 <label>
                   Medio de pago
-                  <input
-                    placeholder="ej. Transferencia"
+                  <select
+                    required
                     value={form.medioPago}
                     onChange={(e) => setForm({ ...form, medioPago: e.target.value })}
-                  />
+                  >
+                    <option value="">Selecciona…</option>
+                    {MEDIOS_PAGO.map((medio) => (
+                      <option key={medio} value={medio}>
+                        {medio}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
 
@@ -174,9 +240,10 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Periodo</th>
-                    <th>Comprometido</th>
+                    <th>Fecha de pago</th>
+                    <th>Periodo de pago</th>
                     <th>Monto</th>
+                    <th>Tipo</th>
                     <th>Estado</th>
                   </tr>
                 </thead>
@@ -186,6 +253,7 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
                       <td>{formatFecha(pago.periodo)}</td>
                       <td>{formatFecha(pago.fechaComprometida)}</td>
                       <td>{formatMonto(pago.monto)}</td>
+                      <td>{pago.esAbono ? 'Abono' : 'Completo'}</td>
                       <td>
                         <span className={`badge badge--${pago.estado.toLowerCase()}`}>
                           {pago.estado as EstadoPago}

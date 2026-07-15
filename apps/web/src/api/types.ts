@@ -134,6 +134,7 @@ export interface Pago {
   fechaPagoReal: string | null;
   monto: string;
   medioPago: string | null;
+  esAbono: boolean;
   estado: EstadoPago;
   aprobado: boolean | null;
 }

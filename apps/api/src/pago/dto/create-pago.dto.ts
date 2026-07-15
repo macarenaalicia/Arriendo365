@@ -43,6 +43,10 @@ export class CreatePagoDto {
   medioPago?: string;
 
   @IsOptional()
+  @IsBoolean()
+  esAbono?: boolean;
+
+  @IsOptional()
   @IsIn(['PENDIENTE', 'PAGADO', 'ATRASADO', 'RECHAZADO'])
   estado?: EstadoPago;
 
