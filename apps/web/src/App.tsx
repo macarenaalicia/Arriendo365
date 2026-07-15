@@ -9,6 +9,7 @@ import { ArriendoDetailPage } from './pages/ArriendoDetailPage';
 import { PagosResumenPage } from './pages/PagosResumenPage';
 import { PropiedadesListPage } from './pages/PropiedadesListPage';
 import { AutosListPage } from './pages/AutosListPage';
+import { PersonasListPage } from './pages/PersonasListPage';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
               <Route path="/pagos" element={<PagosResumenPage />} />
               <Route path="/propiedades" element={<PropiedadesListPage />} />
               <Route path="/autos" element={<AutosListPage />} />
+              <Route path="/personas" element={<PersonasListPage />} />
             </Route>
           </Route>
 

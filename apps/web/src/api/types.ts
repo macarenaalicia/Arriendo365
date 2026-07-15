@@ -66,6 +66,8 @@ export interface Persona {
   rut: string;
   email: string | null;
   telefono: string | null;
+  direccion: string | null;
+  fechaNacimiento: string | null;
 }
 
 export interface ConfiguracionMantencion {

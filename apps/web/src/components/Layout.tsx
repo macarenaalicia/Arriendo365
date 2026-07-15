@@ -20,6 +20,7 @@ export function Layout() {
           </NavLink>
           <NavLink to="/propiedades">Propiedades</NavLink>
           <NavLink to="/autos">Autos</NavLink>
+          <NavLink to="/personas">Personas</NavLink>
           <NavLink to="/pagos">Pagos</NavLink>
         </nav>
         <button type="button" onClick={handleLogout} className="layout__logout">
