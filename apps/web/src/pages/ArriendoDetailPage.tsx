@@ -207,6 +207,17 @@ export function ArriendoDetailPage() {
     setPagos((prev) => prev.filter((p) => p.id !== pagoId));
   };
 
+  const handleAprobarPago = async (pagoId: string) => {
+    await api.patch(`/pagos/${pagoId}`, { aprobado: true, estado: 'PAGADO' });
+    cargarPagos();
+  };
+
+  const handleRechazarPago = async (pagoId: string) => {
+    if (!confirm('¿Rechazar este pago?')) return;
+    await api.patch(`/pagos/${pagoId}`, { aprobado: false, estado: 'RECHAZADO' });
+    cargarPagos();
+  };
+
   const cerrarReqForm = () => {
     setShowReqForm(false);
     setEditingReqId(null);
@@ -429,6 +440,7 @@ export function ArriendoDetailPage() {
                   <th>Monto</th>
                   <th>Tipo</th>
                   <th>Estado</th>
+                  <th>Aprobación</th>
                   {esStaff && <th>Acciones</th>}
                 </tr>
               </thead>
@@ -443,6 +455,33 @@ export function ArriendoDetailPage() {
                       <span className={`badge badge--${pago.estado.toLowerCase()}`}>
                         {pago.estado}
                       </span>
+                    </td>
+                    <td>
+                      {pago.aprobado === true && (
+                        <span className="badge badge--activo">Aprobado</span>
+                      )}
+                      {pago.aprobado === false && (
+                        <span className="badge badge--rechazado">Rechazado</span>
+                      )}
+                      {pago.aprobado === null && (
+                        <div className="table__actions">
+                          <span className="badge badge--pendiente">Pendiente</span>
+                          {esStaff && (
+                            <>
+                              <button type="button" onClick={() => handleAprobarPago(pago.id)}>
+                                Aprobar
+                              </button>
+                              <button
+                                type="button"
+                                className="danger"
+                                onClick={() => handleRechazarPago(pago.id)}
+                              >
+                                Rechazar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </td>
                     {esStaff && (
                       <td>

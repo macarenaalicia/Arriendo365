@@ -245,6 +245,7 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
                     <th>Monto</th>
                     <th>Tipo</th>
                     <th>Estado</th>
+                    <th>Aprobación</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -258,6 +259,17 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
                         <span className={`badge badge--${pago.estado.toLowerCase()}`}>
                           {pago.estado as EstadoPago}
                         </span>
+                      </td>
+                      <td>
+                        {pago.aprobado === true && (
+                          <span className="badge badge--activo">Aprobado</span>
+                        )}
+                        {pago.aprobado === false && (
+                          <span className="badge badge--rechazado">Rechazado</span>
+                        )}
+                        {pago.aprobado === null && (
+                          <span className="badge badge--pendiente">Pendiente</span>
+                        )}
                       </td>
                     </tr>
                   ))}
