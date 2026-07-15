@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import type { Persona } from '../api/types';
+import { ddmmyyyyToIso, isoToDdmmyyyy } from '../lib/format';
+import { DateInput } from '../components/DateInput';
 
 const FORM_INICIAL = {
   nombreCompleto: '',
@@ -50,7 +52,7 @@ export function PersonasListPage() {
       email: persona.email ?? '',
       telefono: persona.telefono ?? '',
       direccion: persona.direccion ?? '',
-      fechaNacimiento: persona.fechaNacimiento ? persona.fechaNacimiento.slice(0, 10) : '',
+      fechaNacimiento: isoToDdmmyyyy(persona.fechaNacimiento),
     });
     setEditingId(persona.id);
     setShowForm(true);
@@ -59,6 +61,16 @@ export function PersonasListPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+
+    let fechaNacimiento: string | undefined;
+    if (form.fechaNacimiento) {
+      fechaNacimiento = ddmmyyyyToIso(form.fechaNacimiento);
+      if (!fechaNacimiento) {
+        setError('Fecha de nacimiento inválida, usa el formato dd/mm/aaaa.');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -67,7 +79,7 @@ export function PersonasListPage() {
         email: form.email || undefined,
         telefono: form.telefono || undefined,
         direccion: form.direccion || undefined,
-        fechaNacimiento: form.fechaNacimiento || undefined,
+        fechaNacimiento,
       };
 
       if (editingId) {
@@ -143,10 +155,9 @@ export function PersonasListPage() {
             </label>
             <label>
               Fecha de nacimiento
-              <input
-                type="date"
+              <DateInput
                 value={form.fechaNacimiento}
-                onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })}
+                onChange={(value) => setForm({ ...form, fechaNacimiento: value })}
               />
             </label>
           </div>

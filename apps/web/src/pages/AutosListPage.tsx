@@ -9,7 +9,8 @@ import type {
   MantencionAuto,
   Persona,
 } from '../api/types';
-import { formatEnumLabel, formatFecha } from '../lib/format';
+import { ddmmyyyyToIso, formatEnumLabel, formatFecha, isoToDdmmyyyy } from '../lib/format';
+import { DateInput } from '../components/DateInput';
 
 const ESTADOS: EstadoAuto[] = ['DISPONIBLE', 'ARRENDADO', 'EN_MANTENCION'];
 const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
@@ -156,7 +157,7 @@ export function AutosListPage() {
       configuracionIds: mantencion.items.map((item) => item.configuracionId),
       kilometrajeActual: String(mantencion.kilometrajeActual),
       kilometrajeProxima: mantencion.kilometrajeProxima ? String(mantencion.kilometrajeProxima) : '',
-      fechaMantencion: mantencion.fechaMantencion.slice(0, 10),
+      fechaMantencion: isoToDdmmyyyy(mantencion.fechaMantencion),
     });
   };
 
@@ -197,6 +198,12 @@ export function AutosListPage() {
       setMantencionError('Elige al menos un tipo de mantención, el km actual y la fecha.');
       return;
     }
+
+    const fechaMantencion = ddmmyyyyToIso(mantencionForm.fechaMantencion);
+    if (!fechaMantencion) {
+      setMantencionError('Fecha inválida, usa el formato dd/mm/aaaa.');
+      return;
+    }
     setMantencionError(null);
 
     const payload = {
@@ -205,7 +212,7 @@ export function AutosListPage() {
       kilometrajeProxima: mantencionForm.kilometrajeProxima
         ? Number(mantencionForm.kilometrajeProxima)
         : undefined,
-      fechaMantencion: mantencionForm.fechaMantencion,
+      fechaMantencion,
     };
 
     if (editingMantencionId) {
@@ -464,11 +471,10 @@ export function AutosListPage() {
                                 setMantencionForm({ ...mantencionForm, kilometrajeProxima: e.target.value })
                               }
                             />
-                            <input
-                              type="date"
+                            <DateInput
                               value={mantencionForm.fechaMantencion}
-                              onChange={(e) =>
-                                setMantencionForm({ ...mantencionForm, fechaMantencion: e.target.value })
+                              onChange={(value) =>
+                                setMantencionForm({ ...mantencionForm, fechaMantencion: value })
                               }
                             />
                             <button type="button" onClick={() => handleGuardarMantencion(auto.id)}>
