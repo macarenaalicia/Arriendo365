@@ -41,6 +41,41 @@ export interface Propiedad {
   descripcion: string | null;
   estado: EstadoPropiedad;
   pagaContribuciones: boolean;
+  precioArriendoEsperado: string | null;
+}
+
+export interface Foto {
+  id: string;
+  archivoUrl: string;
+  descripcion: string | null;
+}
+
+export interface Documento {
+  id: string;
+  tipo: string;
+  archivoUrl: string;
+  fechaEmision: string | null;
+  fechaVencimiento: string | null;
+}
+
+export interface PropiedadPublica {
+  id: string;
+  tipo: TipoPropiedad;
+  calle: string;
+  numero: string;
+  numeroDepartamento: string | null;
+  sector: string | null;
+  ciudad: string;
+  region: string;
+  nHabitaciones: number;
+  nBanos: number;
+  bodega: boolean;
+  estacionamiento: boolean;
+  mt2Totales: string;
+  mt2Construidos: string;
+  descripcion: string | null;
+  precioArriendoEsperado: string | null;
+  fotos: Foto[];
 }
 
 export interface Proveedor {
@@ -63,7 +98,10 @@ export interface Auto {
 export interface Persona {
   id: string;
   nombreCompleto: string;
-  rut: string;
+  /** Un técnico (tipoPersona TECNICO) no exige RUT, solo nombre completo. */
+  rut: string | null;
+  /** Categoriza a la persona (ej. técnico) independiente de si tiene acceso a la plataforma. */
+  tipoPersona: RolUsuario | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -95,6 +133,11 @@ export interface MantencionAuto {
   kilometrajeActual: number;
   kilometrajeProxima: number | null;
   fechaMantencion: string;
+  costo: string | null;
+  medioPago: string | null;
+  estadoPago: EstadoPago;
+  aprobado: boolean | null;
+  motivoRechazo: string | null;
   items: MantencionAutoItem[];
 }
 
@@ -107,6 +150,7 @@ export interface ArriendoAuto {
   contratoDocId: string | null;
   estado: EstadoArriendo;
   arrendatario: Persona;
+  auto: Auto;
 }
 
 export interface ArriendoPropiedad {
@@ -123,7 +167,11 @@ export interface ArriendoPropiedad {
   propiedad: Propiedad;
   arrendatario: Persona;
   codeudor: Persona | null;
+  /** Solo viene informado para el arrendatario que consulta su propio arriendo. */
+  arrendador?: Persona | null;
 }
+
+export type CategoriaPago = 'ARRIENDO' | 'SERVICIOS_BASICOS';
 
 export interface Pago {
   id: string;
@@ -136,7 +184,11 @@ export interface Pago {
   medioPago: string | null;
   esAbono: boolean;
   estado: EstadoPago;
+  categoria: CategoriaPago;
+  tipoServicio: TipoProveedor | null;
   aprobado: boolean | null;
+  motivoRechazo: string | null;
+  createdAt: string;
 }
 
 export interface ResumenPagos {
@@ -150,9 +202,24 @@ export type EstadoRequerimiento =
   | 'PENDIENTE_REVISION'
   | 'REVISION_AGENDADA'
   | 'EN_REVISION'
-  | 'RESUELTO';
+  | 'RESUELTO'
+  | 'RECHAZADO'
+  | 'REABIERTO';
 
 export type TipoReparacion = 'ESTRUCTURAL' | 'LOCATIVA';
+
+export interface RequerimientoActualizacion {
+  id: string;
+  urgencia: UrgenciaRequerimiento;
+  estado: EstadoRequerimiento;
+  tipoReparacion: TipoReparacion;
+  tecnico: Persona | null;
+  notasArrendatario: string | null;
+  detalleResolucion: string | null;
+  nota: string | null;
+  usuario: { persona: Persona } | null;
+  createdAt: string;
+}
 
 export interface Requerimiento {
   id: string;
@@ -167,4 +234,5 @@ export interface Requerimiento {
   notasArrendatario: string | null;
   fechaComprometida: string | null;
   fechaSolucion: string | null;
+  actualizaciones: RequerimientoActualizacion[];
 }

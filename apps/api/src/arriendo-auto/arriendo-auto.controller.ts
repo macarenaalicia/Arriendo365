@@ -27,11 +27,25 @@ export class ArriendoAutoController {
     return this.arriendoAutoService.create(dto);
   }
 
+  // El arrendatario puede consultar (solo lectura) sus propios arriendos de
+  // auto — el resto de acciones sigue siendo solo staff.
+  @Roles(
+    RolUsuario.ADMINISTRADOR,
+    RolUsuario.PROPIETARIO,
+    RolUsuario.TECNICO,
+    RolUsuario.ARRENDATARIO,
+  )
   @Get()
   findAll(@Query() query: FindArriendosAutoDto) {
     return this.arriendoAutoService.findAll(query);
   }
 
+  @Roles(
+    RolUsuario.ADMINISTRADOR,
+    RolUsuario.PROPIETARIO,
+    RolUsuario.TECNICO,
+    RolUsuario.ARRENDATARIO,
+  )
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.arriendoAutoService.findOne(id);

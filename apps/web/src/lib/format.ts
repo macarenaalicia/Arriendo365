@@ -2,6 +2,12 @@ export function formatEnumLabel(value: string): string {
   return value.replace(/_/g, ' ');
 }
 
+export function formatMonto(monto: string | number): string {
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(
+    Number(monto),
+  );
+}
+
 // Reordena los primeros 10 caracteres (yyyy-mm-dd) del ISO string a dd/mm/aaaa
 // sin pasar por Date/Intl, para evitar que un desfase de zona horaria corra
 // el día mostrado.
@@ -28,6 +34,17 @@ export function maskFechaDDMMYYYY(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 8);
   const partes = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean);
   return partes.join('/');
+}
+
+// A diferencia de formatFecha, aquí sí interesa la hora exacta (timestamp de
+// creación), así que usar Date/Intl es seguro: no es un campo "solo fecha".
+export function formatFechaHora(iso: string): string {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()} ${hh}:${min}`;
 }
 
 export function hoyDdmmyyyy(): string {

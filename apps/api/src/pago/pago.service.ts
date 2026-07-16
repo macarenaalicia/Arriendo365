@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoPago, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
@@ -15,10 +15,6 @@ export class PagoService {
 
   private async assertArriendoEnOrganizacion(arriendoTipo: ArriendoTipo, arriendoId: string) {
     const organizacionId = this.tenant.organizacionId;
-
-    if (this.tenant.esArrendatario && arriendoTipo === 'auto') {
-      throw new NotFoundException('Arriendo no encontrado');
-    }
 
     const existe =
       arriendoTipo === 'propiedad'
@@ -37,7 +33,11 @@ export class PagoService {
             },
           })
         : await this.prisma.arriendoAuto.findFirst({
-            where: { id: arriendoId, auto: { organizacionId } },
+            where: {
+              id: arriendoId,
+              auto: { organizacionId },
+              ...(this.tenant.esArrendatario ? { arrendatarioId: this.tenant.personaId } : {}),
+            },
           });
 
     if (!existe) {
@@ -52,17 +52,26 @@ export class PagoService {
     const organizacionId = this.tenant.organizacionId;
 
     if (this.tenant.esArrendatario) {
-      const arriendosPropiedad = await this.prisma.arriendoPropiedad.findMany({
-        where: {
-          propiedad: { organizacionId },
-          OR: [
-            { arrendatarioId: this.tenant.personaId },
-            { codeudorId: this.tenant.personaId },
-          ],
-        },
-        select: { id: true },
-      });
-      return { propiedadIds: arriendosPropiedad.map((a) => a.id), autoIds: [] };
+      const [arriendosPropiedad, arriendosAuto] = await Promise.all([
+        this.prisma.arriendoPropiedad.findMany({
+          where: {
+            propiedad: { organizacionId },
+            OR: [
+              { arrendatarioId: this.tenant.personaId },
+              { codeudorId: this.tenant.personaId },
+            ],
+          },
+          select: { id: true },
+        }),
+        this.prisma.arriendoAuto.findMany({
+          where: { auto: { organizacionId }, arrendatarioId: this.tenant.personaId },
+          select: { id: true },
+        }),
+      ]);
+      return {
+        propiedadIds: arriendosPropiedad.map((a) => a.id),
+        autoIds: arriendosAuto.map((a) => a.id),
+      };
     }
 
     const [arriendosPropiedad, arriendosAuto] = await Promise.all([
@@ -82,30 +91,92 @@ export class PagoService {
     };
   }
 
+  /**
+   * Si ya pasó el día de pago del mes actual y no hay ningún pago de
+   * arriendo registrado (no rechazado) para ese periodo, genera uno con
+   * estado ATRASADO por el monto completo — para que el atraso quede
+   * visible en el resumen aunque nadie haya alcanzado a registrar nada.
+   */
+  private async generarPagoAtrasadoSiCorresponde(arriendoId: string): Promise<void> {
+    const arriendo = await this.prisma.arriendoPropiedad.findUnique({
+      where: { id: arriendoId },
+      select: { fechaPago: true, montoArriendo: true, estado: true },
+    });
+    if (!arriendo || arriendo.estado !== 'ACTIVO') return;
+
+    const hoy = new Date();
+    const ultimoDiaDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    const dia = Math.min(arriendo.fechaPago, ultimoDiaDelMes);
+    const fechaVencimiento = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
+    if (hoy <= fechaVencimiento) return;
+
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const inicioMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+
+    const existente = await this.prisma.pago.findFirst({
+      where: {
+        arriendoTipo: 'propiedad',
+        arriendoId,
+        categoria: 'ARRIENDO',
+        estado: { not: 'RECHAZADO' },
+        fechaComprometida: { gte: inicioMes, lt: inicioMesSiguiente },
+      },
+    });
+    if (existente) return;
+
+    await this.prisma.pago.create({
+      data: {
+        arriendoTipo: 'propiedad',
+        arriendoId,
+        periodo: fechaVencimiento,
+        fechaComprometida: fechaVencimiento,
+        monto: arriendo.montoArriendo,
+        estado: 'ATRASADO',
+        esAbono: false,
+        categoria: 'ARRIENDO',
+      },
+    });
+  }
+
+  private validarTipoServicio(categoria: CreatePagoDto['categoria'], tipoServicio: CreatePagoDto['tipoServicio']) {
+    const esServiciosBasicos = (categoria ?? 'ARRIENDO') === 'SERVICIOS_BASICOS';
+    if (esServiciosBasicos && !tipoServicio) {
+      throw new BadRequestException('Elige a qué servicio corresponde el pago (agua, luz o gas)');
+    }
+    return esServiciosBasicos ? tipoServicio : null;
+  }
+
   async create(dto: CreatePagoDto) {
     await this.assertArriendoEnOrganizacion(dto.arriendoTipo, dto.arriendoId);
+    const tipoServicio = this.validarTipoServicio(dto.categoria, dto.tipoServicio);
 
-    return this.prisma.pago.create({ data: dto });
+    return this.prisma.pago.create({ data: { ...dto, tipoServicio } });
   }
 
   async findAll(query: FindPagosDto) {
     if (query.arriendoTipo && query.arriendoId) {
       await this.assertArriendoEnOrganizacion(query.arriendoTipo, query.arriendoId);
+      if (query.arriendoTipo === 'propiedad') {
+        await this.generarPagoAtrasadoSiCorresponde(query.arriendoId);
+      }
 
       return this.prisma.pago.findMany({
         where: {
           arriendoTipo: query.arriendoTipo,
           arriendoId: query.arriendoId,
           estado: query.estado,
+          categoria: query.categoria,
         },
         orderBy: { periodo: 'desc' },
       });
     }
 
     const { propiedadIds, autoIds } = await this.arriendoIdsDeLaOrganizacion();
+    await Promise.all(propiedadIds.map((id) => this.generarPagoAtrasadoSiCorresponde(id)));
 
     const where: Prisma.PagoWhereInput = {
       estado: query.estado,
+      categoria: query.categoria,
       OR: [
         { arriendoTipo: 'propiedad', arriendoId: { in: propiedadIds } },
         { arriendoTipo: 'auto', arriendoId: { in: autoIds } },
@@ -143,6 +214,7 @@ export class PagoService {
 
   async resumen() {
     const { propiedadIds, autoIds } = await this.arriendoIdsDeLaOrganizacion();
+    await Promise.all(propiedadIds.map((id) => this.generarPagoAtrasadoSiCorresponde(id)));
 
     const pagos = await this.prisma.pago.findMany({
       where: {

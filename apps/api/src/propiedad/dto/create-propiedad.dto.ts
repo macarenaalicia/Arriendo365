@@ -79,4 +79,9 @@ export class CreatePropiedadDto {
   @IsOptional()
   @IsBoolean()
   pagaContribuciones?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  precioArriendoEsperado?: number;
 }

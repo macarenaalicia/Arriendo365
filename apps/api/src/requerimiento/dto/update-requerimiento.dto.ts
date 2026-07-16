@@ -58,4 +58,8 @@ export class UpdateRequerimientoDto {
   @IsOptional()
   @IsEnum(QuienPago)
   quienPago?: QuienPago;
+
+  @IsOptional()
+  @IsString()
+  notaActualizacion?: string;
 }

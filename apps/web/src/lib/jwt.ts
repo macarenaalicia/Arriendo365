@@ -3,6 +3,7 @@ export interface JwtPayload {
   organizacionId: string;
   personaId: string;
   rol: string;
+  nombreCompleto: string;
 }
 
 export function decodeJwtPayload(token: string): JwtPayload | null {

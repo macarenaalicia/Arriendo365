@@ -1,11 +1,30 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
-import type { EstadoProveedor, Propiedad, Proveedor, TipoProveedor } from '../api/types';
-import { formatEnumLabel } from '../lib/format';
+import type { Documento, EstadoProveedor, Foto, Propiedad, Proveedor, TipoProveedor } from '../api/types';
+import { formatEnumLabel, formatFecha } from '../lib/format';
+import { eliminarFoto, listarFotos, subirFoto } from '../lib/fotos';
+import { eliminarDocumento, listarDocumentos, subirDocumento } from '../lib/documentos';
+import { Modal } from '../components/Modal';
+import { IconEditar, IconEliminar } from '../components/icons';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
 const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION', 'USUFRUCTO'] as const;
+
+const DOCUMENTO_TIPOS_PROPIEDAD = [
+  'Escritura',
+  'Certificado de dominio vigente',
+  'Certificado de avalúo fiscal',
+  'Reglamento de copropiedad',
+  'Dicom360',
+];
+
+const DOCUMENTO_FORM_INICIAL = {
+  tipo: '',
+  fechaEmision: '',
+  fechaVencimiento: '',
+};
 
 type CampoOrdenable =
   | 'rol'
@@ -37,6 +56,7 @@ const FORM_INICIAL = {
   estacionamiento: false,
   pagaContribuciones: false,
   descripcion: '',
+  precioArriendoEsperado: '',
   aguaEmpresa: EMPRESAS_POR_TIPO_PROVEEDOR.AGUA[0],
   aguaCliente: '',
   luzEmpresa: EMPRESAS_POR_TIPO_PROVEEDOR.LUZ[0],
@@ -59,6 +79,7 @@ const PROVEEDOR_FORM_INICIAL = {
 };
 
 export function PropiedadesListPage() {
+  const { organizacionId } = useAuth();
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -67,10 +88,23 @@ export function PropiedadesListPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedorForm, setProveedorForm] = useState(PROVEEDOR_FORM_INICIAL);
   const [editingProveedorId, setEditingProveedorId] = useState<string | null>(null);
+
+  const [fotos, setFotos] = useState<Foto[]>([]);
+  const [fotoDescripcion, setFotoDescripcion] = useState('');
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [fotoError, setFotoError] = useState<string | null>(null);
+  const [arrastrandoFoto, setArrastrandoFoto] = useState(false);
+
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
+  const [documentoForm, setDocumentoForm] = useState(DOCUMENTO_FORM_INICIAL);
+  const [subiendoDocumento, setSubiendoDocumento] = useState(false);
+  const [documentoError, setDocumentoError] = useState<string | null>(null);
+  const [mostrarAgregarDocumento, setMostrarAgregarDocumento] = useState(false);
+  const [documentoRecienSubido, setDocumentoRecienSubido] = useState(false);
+  const [arrastrandoDocumento, setArrastrandoDocumento] = useState(false);
 
   const [sortField, setSortField] = useState<CampoOrdenable | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -170,10 +204,21 @@ export function PropiedadesListPage() {
   const abrirCreacion = () => {
     setForm(FORM_INICIAL);
     setEditingId(null);
+    setFotos([]);
+    setFotoDescripcion('');
+    setFotoError(null);
+    setDocumentos([]);
+    setDocumentoForm(DOCUMENTO_FORM_INICIAL);
+    setDocumentoError(null);
+    setMostrarAgregarDocumento(false);
+    setDocumentoRecienSubido(false);
+    setProveedores([]);
+    setEditingProveedorId(null);
+    setProveedorForm(PROVEEDOR_FORM_INICIAL);
     setShowForm(true);
   };
 
-  const abrirEdicion = (propiedad: Propiedad) => {
+  const abrirEdicion = async (propiedad: Propiedad) => {
     setForm({
       ...FORM_INICIAL,
       rol: propiedad.rol,
@@ -192,9 +237,26 @@ export function PropiedadesListPage() {
       estacionamiento: propiedad.estacionamiento,
       pagaContribuciones: propiedad.pagaContribuciones,
       descripcion: propiedad.descripcion ?? '',
+      precioArriendoEsperado: propiedad.precioArriendoEsperado ?? '',
     });
     setEditingId(propiedad.id);
+    setFotoDescripcion('');
+    setFotoError(null);
+    setDocumentoForm(DOCUMENTO_FORM_INICIAL);
+    setDocumentoError(null);
+    setMostrarAgregarDocumento(false);
+    setDocumentoRecienSubido(false);
+    setEditingProveedorId(null);
+    setProveedorForm(PROVEEDOR_FORM_INICIAL);
     setShowForm(true);
+    const [listaFotos, listaDocumentos, listaProveedores] = await Promise.all([
+      listarFotos('propiedad', propiedad.id),
+      listarDocumentos('propiedad', propiedad.id),
+      api.get<Proveedor[]>(`/propiedades/${propiedad.id}/proveedores`),
+    ]);
+    setFotos(listaFotos);
+    setDocumentos(listaDocumentos);
+    setProveedores(listaProveedores);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -220,6 +282,9 @@ export function PropiedadesListPage() {
         estacionamiento: form.estacionamiento,
         pagaContribuciones: form.pagaContribuciones,
         descripcion: form.descripcion || undefined,
+        precioArriendoEsperado: form.precioArriendoEsperado
+          ? Number(form.precioArriendoEsperado)
+          : undefined,
       };
 
       if (editingId) {
@@ -251,20 +316,110 @@ export function PropiedadesListPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta propiedad?')) return;
     await api.delete(`/propiedades/${id}`);
-    if (expandedId === id) setExpandedId(null);
     cargar();
   };
 
-  const toggleProveedores = async (propiedadId: string) => {
-    if (expandedId === propiedadId) {
-      setExpandedId(null);
+  const subirArchivoFoto = async (archivo: File) => {
+    if (!editingId) return;
+
+    setFotoError(null);
+    setSubiendoFoto(true);
+    try {
+      await subirFoto(archivo, 'propiedad', editingId, fotoDescripcion || undefined);
+      setFotoDescripcion('');
+      const lista = await listarFotos('propiedad', editingId);
+      setFotos(lista);
+    } catch (err) {
+      setFotoError(err instanceof ApiError ? err.message : 'No se pudo subir la foto');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  const handleSubirFoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = event.target.files?.[0];
+    event.target.value = '';
+    if (archivo) subirArchivoFoto(archivo);
+  };
+
+  const handleDropFoto = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setArrastrandoFoto(false);
+    const archivo = event.dataTransfer.files?.[0];
+    if (archivo) subirArchivoFoto(archivo);
+  };
+
+  const handleEliminarFoto = async (fotoId: string) => {
+    await eliminarFoto(fotoId);
+    setFotos((prev) => prev.filter((f) => f.id !== fotoId));
+  };
+
+  const subirArchivoDocumento = async (archivo: File) => {
+    if (!editingId) return;
+
+    if (!documentoForm.tipo) {
+      setDocumentoError('Elige el tipo de documento.');
       return;
     }
-    setExpandedId(propiedadId);
-    setEditingProveedorId(null);
-    setProveedorForm(PROVEEDOR_FORM_INICIAL);
-    const lista = await api.get<Proveedor[]>(`/propiedades/${propiedadId}/proveedores`);
-    setProveedores(lista);
+
+    setDocumentoError(null);
+    setSubiendoDocumento(true);
+    try {
+      await subirDocumento(
+        archivo,
+        documentoForm.tipo,
+        'propiedad',
+        editingId,
+        documentoForm.fechaEmision || undefined,
+        documentoForm.fechaVencimiento || undefined,
+      );
+      setDocumentoForm(DOCUMENTO_FORM_INICIAL);
+      setDocumentoRecienSubido(true);
+      const lista = await listarDocumentos('propiedad', editingId);
+      setDocumentos(lista);
+    } catch (err) {
+      setDocumentoError(err instanceof ApiError ? err.message : 'No se pudo subir el documento');
+    } finally {
+      setSubiendoDocumento(false);
+    }
+  };
+
+  const handleSubirDocumento = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = event.target.files?.[0];
+    event.target.value = '';
+    if (archivo) subirArchivoDocumento(archivo);
+  };
+
+  const handleDropDocumento = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setArrastrandoDocumento(false);
+    const archivo = event.dataTransfer.files?.[0];
+    if (archivo) subirArchivoDocumento(archivo);
+  };
+
+  const handleEliminarDocumento = async (documentoId: string) => {
+    await eliminarDocumento(documentoId);
+    setDocumentos((prev) => prev.filter((d) => d.id !== documentoId));
+  };
+
+  const abrirModalDocumento = () => {
+    setDocumentoForm(DOCUMENTO_FORM_INICIAL);
+    setDocumentoError(null);
+    setDocumentoRecienSubido(false);
+    setMostrarAgregarDocumento(true);
+  };
+
+  const cerrarModalDocumento = () => {
+    setMostrarAgregarDocumento(false);
+    setDocumentoRecienSubido(false);
+    setDocumentoForm(DOCUMENTO_FORM_INICIAL);
+    setDocumentoError(null);
+  };
+
+  const agregarOtroDocumento = () => {
+    setDocumentoForm(DOCUMENTO_FORM_INICIAL);
+    setDocumentoError(null);
+    setDocumentoRecienSubido(false);
   };
 
   const abrirEdicionProveedor = (proveedor: Proveedor) => {
@@ -282,23 +437,24 @@ export function PropiedadesListPage() {
     setProveedorForm(PROVEEDOR_FORM_INICIAL);
   };
 
-  const handleGuardarProveedor = async (propiedadId: string) => {
-    if (!proveedorForm.nCliente.trim()) return;
+  const handleGuardarProveedor = async () => {
+    if (!editingId || !proveedorForm.nCliente.trim()) return;
 
     if (editingProveedorId) {
-      await api.patch(`/propiedades/${propiedadId}/proveedores/${editingProveedorId}`, proveedorForm);
+      await api.patch(`/propiedades/${editingId}/proveedores/${editingProveedorId}`, proveedorForm);
     } else {
-      await api.post(`/propiedades/${propiedadId}/proveedores`, proveedorForm);
+      await api.post(`/propiedades/${editingId}/proveedores`, proveedorForm);
     }
 
     setEditingProveedorId(null);
     setProveedorForm(PROVEEDOR_FORM_INICIAL);
-    const lista = await api.get<Proveedor[]>(`/propiedades/${propiedadId}/proveedores`);
+    const lista = await api.get<Proveedor[]>(`/propiedades/${editingId}/proveedores`);
     setProveedores(lista);
   };
 
-  const handleDeleteProveedor = async (propiedadId: string, proveedorId: string) => {
-    await api.delete(`/propiedades/${propiedadId}/proveedores/${proveedorId}`);
+  const handleDeleteProveedor = async (proveedorId: string) => {
+    if (!editingId) return;
+    await api.delete(`/propiedades/${editingId}/proveedores/${proveedorId}`);
     if (editingProveedorId === proveedorId) cancelarEdicionProveedor();
     setProveedores((prev) => prev.filter((p) => p.id !== proveedorId));
   };
@@ -307,12 +463,25 @@ export function PropiedadesListPage() {
     <div>
       <div className="page-header">
         <h1>Propiedades</h1>
-        <button type="button" onClick={showForm ? cerrarForm : abrirCreacion}>
-          {showForm ? 'Cancelar' : '+ Nueva propiedad'}
-        </button>
+        <div className="page-header__actions">
+          {organizacionId && (
+            <a
+              className="back-link"
+              href={`/publico/${organizacionId}/propiedades`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Ver página pública ↗
+            </a>
+          )}
+          <button type="button" onClick={abrirCreacion}>
+            + Nueva propiedad
+          </button>
+        </div>
       </div>
 
       {showForm && (
+        <Modal titulo={editingId ? 'Editar propiedad' : 'Nueva propiedad'} onClose={cerrarForm}>
         <form className="inline-form" onSubmit={handleSubmit}>
           <div className="inline-form__grid">
             <label>
@@ -463,6 +632,308 @@ export function PropiedadesListPage() {
             />
           </label>
 
+          <label>
+            Precio de arriendo esperado (solo referencial, para la vista pública)
+            <input
+              type="number"
+              min={0}
+              placeholder="Ej. 450000"
+              value={form.precioArriendoEsperado}
+              onChange={(e) => setForm({ ...form, precioArriendoEsperado: e.target.value })}
+            />
+          </label>
+
+          {editingId && (
+            <fieldset className="inline-form__fieldset">
+              <legend>Fotos</legend>
+              {fotoError && <p className="auth-card__error">{fotoError}</p>}
+              {fotos.length === 0 && (
+                <p className="empty-state">Sin fotos publicadas todavía.</p>
+              )}
+              <div className="fotos-grid">
+                {fotos.map((foto) => (
+                  <div key={foto.id} className="fotos-grid__item">
+                    <img src={foto.archivoUrl} alt={foto.descripcion ?? 'Foto de la propiedad'} />
+                    <span>{foto.descripcion || 'Sin descripción'}</span>
+                    <button
+                      type="button"
+                      className="danger danger--small"
+                      onClick={() => handleEliminarFoto(foto.id)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="proveedores-panel__add">
+                <input
+                  placeholder="Descripción de la foto (opcional)"
+                  value={fotoDescripcion}
+                  onChange={(e) => setFotoDescripcion(e.target.value)}
+                />
+              </div>
+
+              <div
+                className={`dropzone${arrastrandoFoto ? ' dropzone--arrastrando' : ''}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setArrastrandoFoto(true);
+                }}
+                onDragLeave={() => setArrastrandoFoto(false)}
+                onDrop={handleDropFoto}
+              >
+                <span>Elige una foto o arrástrala aquí</span>
+                <label className="button-like">
+                  {subiendoFoto ? 'Subiendo…' : '+ Subir foto'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    disabled={subiendoFoto}
+                    onChange={handleSubirFoto}
+                  />
+                </label>
+              </div>
+            </fieldset>
+          )}
+
+          {editingId && (
+            <fieldset className="inline-form__fieldset">
+              <div className="fieldset-header">
+                <legend>Documentos</legend>
+                <button type="button" onClick={abrirModalDocumento}>
+                  + Agregar documento
+                </button>
+              </div>
+
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Tipo</th>
+                      <th>Emitido</th>
+                      <th>Vence</th>
+                      <th>Archivo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documentos.map((doc) => (
+                      <tr key={doc.id}>
+                        <td>{doc.tipo}</td>
+                        <td>{doc.fechaEmision ? formatFecha(doc.fechaEmision) : '—'}</td>
+                        <td>{doc.fechaVencimiento ? formatFecha(doc.fechaVencimiento) : '—'}</td>
+                        <td>
+                          <a href={doc.archivoUrl} target="_blank" rel="noreferrer">
+                            Ver
+                          </a>
+                        </td>
+                        <td>
+                          <div className="table__actions">
+                            <button
+                              type="button"
+                              className="icon-button icon-button--danger"
+                              title="Eliminar"
+                              aria-label="Eliminar"
+                              onClick={() => handleEliminarDocumento(doc.id)}
+                            >
+                              <IconEliminar />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {mostrarAgregarDocumento && (
+                <Modal titulo="Agregar documento" onClose={cerrarModalDocumento}>
+                  {documentoError && <p className="auth-card__error">{documentoError}</p>}
+                  {documentoRecienSubido ? (
+                    <div className="inline-form">
+                      <p>Documento subido correctamente.</p>
+                      <div className="page-header__actions">
+                        <button type="button" onClick={agregarOtroDocumento}>
+                          + Agregar otro documento
+                        </button>
+                        <button type="button" onClick={cerrarModalDocumento}>
+                          Cerrar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="inline-form">
+                      <div className="inline-form__grid">
+                        <label>
+                          Tipo de documento
+                          <select
+                            value={documentoForm.tipo}
+                            onChange={(e) =>
+                              setDocumentoForm({ ...documentoForm, tipo: e.target.value })
+                            }
+                          >
+                            <option value="">Elige un tipo…</option>
+                            {DOCUMENTO_TIPOS_PROPIEDAD.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Fecha de emisión (opcional)
+                          <input
+                            type="date"
+                            value={documentoForm.fechaEmision}
+                            onChange={(e) =>
+                              setDocumentoForm({ ...documentoForm, fechaEmision: e.target.value })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Fecha de vencimiento (opcional)
+                          <input
+                            type="date"
+                            value={documentoForm.fechaVencimiento}
+                            onChange={(e) =>
+                              setDocumentoForm({ ...documentoForm, fechaVencimiento: e.target.value })
+                            }
+                          />
+                        </label>
+                      </div>
+
+                      <div
+                        className={`dropzone${arrastrandoDocumento ? ' dropzone--arrastrando' : ''}`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setArrastrandoDocumento(true);
+                        }}
+                        onDragLeave={() => setArrastrandoDocumento(false)}
+                        onDrop={handleDropDocumento}
+                      >
+                        <span>Elige un archivo o arrástralo aquí</span>
+                        <label className="button-like">
+                          {subiendoDocumento ? 'Subiendo…' : '+ Subir documento'}
+                          <input
+                            type="file"
+                            hidden
+                            disabled={subiendoDocumento}
+                            onChange={handleSubirDocumento}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </Modal>
+              )}
+            </fieldset>
+          )}
+
+          {editingId && (
+            <fieldset className="inline-form__fieldset">
+              <legend>Cuentas de proveedores</legend>
+              {proveedores.length === 0 && (
+                <p className="empty-state">Sin cuentas de proveedores registradas.</p>
+              )}
+              <div className="proveedores-panel__grid">
+                {proveedores.map((proveedor) => (
+                  <div key={proveedor.id} className="proveedores-panel__row">
+                    <span className="proveedores-panel__tipo">
+                      {PROVEEDOR_LABELS[proveedor.tipo]}
+                    </span>
+                    <span>Empresa: {proveedor.empresa}</span>
+                    <span>N° cliente: {proveedor.nCliente}</span>
+                    <span>
+                      Estado:{' '}
+                      <span className={`badge badge--${proveedor.estado.toLowerCase()}`}>
+                        {proveedor.estado}
+                      </span>
+                    </span>
+                    <div className="proveedores-panel__row-actions">
+                      <button
+                        type="button"
+                        className="icon-button icon-button--small"
+                        title="Editar"
+                        aria-label="Editar"
+                        onClick={() => abrirEdicionProveedor(proveedor)}
+                      >
+                        <IconEditar />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button icon-button--small icon-button--danger"
+                        title="Eliminar"
+                        aria-label="Eliminar"
+                        onClick={() => handleDeleteProveedor(proveedor.id)}
+                      >
+                        <IconEliminar />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="proveedores-panel__add">
+                <select
+                  value={proveedorForm.tipo}
+                  onChange={(e) => {
+                    const tipo = e.target.value as TipoProveedor;
+                    setProveedorForm({
+                      ...proveedorForm,
+                      tipo,
+                      empresa: EMPRESAS_POR_TIPO_PROVEEDOR[tipo][0],
+                    });
+                  }}
+                >
+                  {(Object.keys(PROVEEDOR_LABELS) as TipoProveedor[]).map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {PROVEEDOR_LABELS[tipo]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={proveedorForm.empresa}
+                  onChange={(e) => setProveedorForm({ ...proveedorForm, empresa: e.target.value })}
+                >
+                  {EMPRESAS_POR_TIPO_PROVEEDOR[proveedorForm.tipo].map((empresa) => (
+                    <option key={empresa} value={empresa}>
+                      {empresa}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  placeholder="N° cliente"
+                  value={proveedorForm.nCliente}
+                  onChange={(e) => setProveedorForm({ ...proveedorForm, nCliente: e.target.value })}
+                />
+                {editingProveedorId && (
+                  <select
+                    value={proveedorForm.estado}
+                    onChange={(e) =>
+                      setProveedorForm({
+                        ...proveedorForm,
+                        estado: e.target.value as EstadoProveedor,
+                      })
+                    }
+                  >
+                    <option value="ACTIVO">ACTIVO</option>
+                    <option value="INACTIVO">INACTIVO</option>
+                  </select>
+                )}
+                <button type="button" onClick={handleGuardarProveedor}>
+                  {editingProveedorId ? 'Guardar cambios' : 'Agregar'}
+                </button>
+                {editingProveedorId && (
+                  <button type="button" onClick={cancelarEdicionProveedor}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </fieldset>
+          )}
+
           {!editingId && (
             <fieldset className="inline-form__fieldset">
               <legend>Cuentas de proveedores (opcional)</legend>
@@ -537,6 +1008,7 @@ export function PropiedadesListPage() {
             {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Guardar propiedad'}
           </button>
         </form>
+        </Modal>
       )}
 
       {loading && <p>Cargando…</p>}
@@ -575,8 +1047,7 @@ export function PropiedadesListPage() {
             </thead>
             <tbody>
               {propiedadesOrdenadas.map((propiedad) => (
-                <Fragment key={propiedad.id}>
-                  <tr>
+                  <tr key={propiedad.id}>
                     <td
                       className="cell-editable"
                       onClick={() => startEditCell(propiedad, 'rol')}
@@ -606,7 +1077,7 @@ export function PropiedadesListPage() {
                     </td>
                     <td>
                       <select
-                        className="cell-select"
+                        className={`cell-select badge badge--${propiedad.tipo.toLowerCase()}`}
                         value={propiedad.tipo}
                         onChange={(e) => guardarCampo(propiedad.id, 'tipo', e.target.value)}
                       >
@@ -660,124 +1131,27 @@ export function PropiedadesListPage() {
                     </td>
                     <td>
                       <div className="table__actions">
-                        <button type="button" onClick={() => abrirEdicion(propiedad)}>
-                          Editar
-                        </button>
-                        <button type="button" onClick={() => toggleProveedores(propiedad.id)}>
-                          {expandedId === propiedad.id ? 'Ocultar' : 'Proveedores'}
+                        <button
+                          type="button"
+                          className="icon-button"
+                          title="Editar"
+                          aria-label="Editar"
+                          onClick={() => abrirEdicion(propiedad)}
+                        >
+                          <IconEditar />
                         </button>
                         <button
                           type="button"
-                          className="danger"
+                          className="icon-button icon-button--danger"
+                          title="Eliminar"
+                          aria-label="Eliminar"
                           onClick={() => handleDelete(propiedad.id)}
                         >
-                          Eliminar
+                          <IconEliminar />
                         </button>
                       </div>
                     </td>
                   </tr>
-
-                  {expandedId === propiedad.id && (
-                    <tr>
-                      <td colSpan={10}>
-                        <div className="proveedores-panel">
-                          {proveedores.length === 0 && (
-                            <p className="empty-state">Sin cuentas de proveedores registradas.</p>
-                          )}
-                          {proveedores.map((proveedor) => (
-                            <div key={proveedor.id} className="proveedores-panel__row">
-                              <span className="proveedores-panel__tipo">
-                                {PROVEEDOR_LABELS[proveedor.tipo]}
-                              </span>
-                              <span>{proveedor.empresa}</span>
-                              <span>{proveedor.nCliente}</span>
-                              <span className={`badge badge--${proveedor.estado.toLowerCase()}`}>
-                                {proveedor.estado}
-                              </span>
-                              <div className="proveedores-panel__row-actions">
-                                <button
-                                  type="button"
-                                  className="small"
-                                  onClick={() => abrirEdicionProveedor(proveedor)}
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  className="danger danger--small"
-                                  onClick={() => handleDeleteProveedor(propiedad.id, proveedor.id)}
-                                >
-                                  Eliminar
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-
-                          <div className="proveedores-panel__add">
-                            <select
-                              value={proveedorForm.tipo}
-                              onChange={(e) => {
-                                const tipo = e.target.value as TipoProveedor;
-                                setProveedorForm({
-                                  ...proveedorForm,
-                                  tipo,
-                                  empresa: EMPRESAS_POR_TIPO_PROVEEDOR[tipo][0],
-                                });
-                              }}
-                            >
-                              {(Object.keys(PROVEEDOR_LABELS) as TipoProveedor[]).map((tipo) => (
-                                <option key={tipo} value={tipo}>
-                                  {PROVEEDOR_LABELS[tipo]}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              value={proveedorForm.empresa}
-                              onChange={(e) =>
-                                setProveedorForm({ ...proveedorForm, empresa: e.target.value })
-                              }
-                            >
-                              {EMPRESAS_POR_TIPO_PROVEEDOR[proveedorForm.tipo].map((empresa) => (
-                                <option key={empresa} value={empresa}>
-                                  {empresa}
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              placeholder="N° cliente"
-                              value={proveedorForm.nCliente}
-                              onChange={(e) =>
-                                setProveedorForm({ ...proveedorForm, nCliente: e.target.value })
-                              }
-                            />
-                            {editingProveedorId && (
-                              <select
-                                value={proveedorForm.estado}
-                                onChange={(e) =>
-                                  setProveedorForm({
-                                    ...proveedorForm,
-                                    estado: e.target.value as EstadoProveedor,
-                                  })
-                                }
-                              >
-                                <option value="ACTIVO">ACTIVO</option>
-                                <option value="INACTIVO">INACTIVO</option>
-                              </select>
-                            )}
-                            <button type="button" onClick={() => handleGuardarProveedor(propiedad.id)}>
-                              {editingProveedorId ? 'Guardar cambios' : 'Agregar'}
-                            </button>
-                            {editingProveedorId && (
-                              <button type="button" onClick={cancelarEdicionProveedor}>
-                                Cancelar
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
               ))}
             </tbody>
           </table>

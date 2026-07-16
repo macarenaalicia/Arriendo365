@@ -1,10 +1,84 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import type { ArriendoPropiedad, EstadoArriendo, Persona, Propiedad } from '../api/types';
-import { ddmmyyyyToIso } from '../lib/format';
+import type {
+  ArriendoPropiedad,
+  CategoriaPago,
+  EstadoArriendo,
+  Pago,
+  Persona,
+  Propiedad,
+  Requerimiento,
+} from '../api/types';
+import { ddmmyyyyToIso, formatFecha, formatMonto } from '../lib/format';
 import { DateInput } from '../components/DateInput';
+import { Modal } from '../components/Modal';
+import { calcularProximaAlza, ESTADO_ALZA_LABELS } from '../lib/alzas';
+import { periodoValorAFecha } from '../lib/periodos';
+
+const REQUERIMIENTO_ESTADOS_ABIERTOS = [
+  'PENDIENTE_REVISION',
+  'REVISION_AGENDADA',
+  'EN_REVISION',
+  'REABIERTO',
+];
+
+interface EstadoMesActual {
+  claseBadge: string;
+  label: string;
+}
+
+const ESTADO_PAGO_LABELS: Record<string, string> = {
+  PENDIENTE: 'Pendiente',
+  PAGADO: 'Pagado',
+  ATRASADO: 'Atrasado',
+  RECHAZADO: 'Rechazado',
+};
+
+/**
+ * Estado del pago del mes actual de una categoría (arriendo o servicios
+ * básicos), para mostrar en su propia columna en la tabla — la etiqueta ya
+ * no repite el nombre de la categoría porque el encabezado de la columna la
+ * identifica.
+ */
+function calcularEstadoMesActual(
+  arriendo: ArriendoPropiedad,
+  pagos: Pago[],
+  categoria: CategoriaPago,
+): EstadoMesActual | null {
+  if (arriendo.estado !== 'ACTIVO') return null;
+
+  const hoy = new Date();
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  const pagosDelMes = pagos.filter(
+    (p) =>
+      p.arriendoTipo === 'propiedad' &&
+      p.arriendoId === arriendo.id &&
+      p.categoria === categoria &&
+      p.fechaComprometida.slice(0, 7) === mesActual,
+  );
+
+  const pagoCompleto = pagosDelMes.find((p) => p.estado !== 'RECHAZADO' && !p.esAbono);
+  if (pagoCompleto) {
+    return {
+      claseBadge: pagoCompleto.estado.toLowerCase(),
+      label: ESTADO_PAGO_LABELS[pagoCompleto.estado],
+    };
+  }
+
+  const tieneAbono = pagosDelMes.some((p) => p.estado !== 'RECHAZADO' && p.esAbono);
+  if (tieneAbono) {
+    return { claseBadge: 'abono', label: 'Abono recibido este mes' };
+  }
+
+  const fechaVencimiento = periodoValorAFecha(mesActual, arriendo.fechaPago);
+  const hoyIso = hoy.toISOString().slice(0, 10);
+  if (hoyIso > fechaVencimiento) {
+    return { claseBadge: 'atrasado', label: 'Sin registrar' };
+  }
+  return { claseBadge: 'pendiente', label: 'Pendiente de registrar' };
+}
 
 const PERIODOS_ALZA = ['MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL', 'SIN REAJUSTE'] as const;
 
@@ -27,15 +101,10 @@ const FORM_INICIAL = {
   garantiaMontoPactado: '',
 };
 
-function formatMonto(monto: string) {
-  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(
-    Number(monto),
-  );
-}
-
 export function ArriendosListPage() {
   const { rol } = useAuth();
   const esStaff = rol !== 'ARRENDATARIO';
+  const navigate = useNavigate();
 
   const [arriendos, setArriendos] = useState<ArriendoPropiedad[]>([]);
   const [estado, setEstado] = useState<EstadoArriendo | ''>('ACTIVO');
@@ -48,6 +117,9 @@ export function ArriendosListPage() {
   const [form, setForm] = useState(FORM_INICIAL);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
 
   const cargar = () => {
     setLoading(true);
@@ -65,7 +137,18 @@ export function ArriendosListPage() {
     if (!esStaff) return;
     api.get<Propiedad[]>('/propiedades').then(setPropiedades);
     api.get<Persona[]>('/personas').then(setPersonas);
+    api.get<Pago[]>('/pagos').then(setPagos);
+    api.get<Requerimiento[]>('/requerimientos').then(setRequerimientos);
   }, [esStaff]);
+
+  useEffect(() => {
+    if (esStaff) return;
+    api.get<ArriendoPropiedad[]>('/arriendos-propiedad').then((todos) => {
+      if (todos.length === 1) {
+        navigate(`/arriendos/${todos[0].id}`, { replace: true });
+      }
+    });
+  }, [esStaff, navigate]);
 
   const cerrarForm = () => {
     setShowForm(false);
@@ -107,6 +190,14 @@ export function ArriendosListPage() {
     }
   };
 
+  const arriendosConAlzaPendiente = esStaff
+    ? arriendos.filter((a) => {
+        if (a.estado !== 'ACTIVO') return false;
+        const alza = calcularProximaAlza(a.fechaEntrega, a.periodoAlza);
+        return alza !== null && (alza.estado === 'vencido' || alza.estado === 'proximo');
+      })
+    : [];
+
   return (
     <div>
       <div className="page-header">
@@ -120,14 +211,15 @@ export function ArriendosListPage() {
             ))}
           </select>
           {esStaff && (
-            <button type="button" onClick={showForm ? cerrarForm : () => setShowForm(true)}>
-              {showForm ? 'Cancelar' : '+ Nuevo arriendo'}
+            <button type="button" onClick={() => setShowForm(true)}>
+              + Nuevo arriendo
             </button>
           )}
         </div>
       </div>
 
       {esStaff && showForm && (
+        <Modal titulo="Nuevo arriendo" onClose={cerrarForm}>
         <form className="inline-form" onSubmit={handleSubmit}>
           <div className="inline-form__grid">
             <label>
@@ -155,7 +247,8 @@ export function ArriendosListPage() {
                 <option value="">Elige una persona…</option>
                 {personas.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nombreCompleto} ({p.rut})
+                    {p.nombreCompleto}
+                    {p.rut ? ` (${p.rut})` : ''}
                   </option>
                 ))}
               </select>
@@ -169,7 +262,8 @@ export function ArriendosListPage() {
                 <option value="">Sin codeudor</option>
                 {personas.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nombreCompleto} ({p.rut})
+                    {p.nombreCompleto}
+                    {p.rut ? ` (${p.rut})` : ''}
                   </option>
                 ))}
               </select>
@@ -248,6 +342,7 @@ export function ArriendosListPage() {
             {saving ? 'Guardando…' : 'Guardar arriendo'}
           </button>
         </form>
+        </Modal>
       )}
 
       {loading && <p>Cargando…</p>}
@@ -257,21 +352,119 @@ export function ArriendosListPage() {
         <p className="empty-state">No hay arriendos {estado ? estado.toLowerCase() : ''}.</p>
       )}
 
-      <div className="card-list">
-        {arriendos.map((arriendo) => (
-          <Link key={arriendo.id} to={`/arriendos/${arriendo.id}`} className="card">
-            <div className="card__title">
-              {arriendo.propiedad.calle} {arriendo.propiedad.numero}
-            </div>
-            <div className="card__subtitle">{arriendo.arrendatario.nombreCompleto}</div>
-            <div className="card__row">
-              <span className={`badge badge--${arriendo.estado.toLowerCase()}`}>
-                {arriendo.estado}
-              </span>
-              <span>{formatMonto(arriendo.montoArriendo)}/mes</span>
-            </div>
-          </Link>
-        ))}
+      {esStaff && arriendosConAlzaPendiente.length > 0 && (
+        <div className="alza-banner">
+          <span>
+            {arriendosConAlzaPendiente.length} arriendo
+            {arriendosConAlzaPendiente.length > 1 ? 's' : ''} con reajuste atrasado o próximo
+          </span>
+        </div>
+      )}
+
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Propiedad</th>
+              <th>Arrendatario</th>
+              <th>Estado</th>
+              <th>Monto</th>
+              {esStaff && <th>Arriendo</th>}
+              {esStaff && <th>Servicios básicos</th>}
+              {esStaff && <th>Requerimientos</th>}
+              {esStaff && <th>Reajuste</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {arriendos.map((arriendo) => {
+              const alza =
+                esStaff && arriendo.estado === 'ACTIVO'
+                  ? calcularProximaAlza(arriendo.fechaEntrega, arriendo.periodoAlza)
+                  : null;
+              const alzaVisible =
+                alza && (alza.estado === 'vencido' || alza.estado === 'proximo') ? alza : null;
+              const estadoArriendo = esStaff
+                ? calcularEstadoMesActual(arriendo, pagos, 'ARRIENDO')
+                : null;
+              const estadoServicios = esStaff
+                ? calcularEstadoMesActual(arriendo, pagos, 'SERVICIOS_BASICOS')
+                : null;
+              const requerimientosAbiertos = esStaff
+                ? requerimientos.filter(
+                    (r) =>
+                      r.arriendoPropiedadId === arriendo.id &&
+                      REQUERIMIENTO_ESTADOS_ABIERTOS.includes(r.estado),
+                  ).length
+                : 0;
+
+              return (
+                <tr key={arriendo.id}>
+                  <td>
+                    <Link to={`/arriendos/${arriendo.id}`}>
+                      {arriendo.propiedad.calle} {arriendo.propiedad.numero}
+                    </Link>
+                  </td>
+                  <td>{arriendo.arrendatario.nombreCompleto}</td>
+                  <td>
+                    <span className={`badge badge--${arriendo.estado.toLowerCase()}`}>
+                      {arriendo.estado}
+                    </span>
+                  </td>
+                  <td>{formatMonto(arriendo.montoArriendo)}/mes</td>
+                  {esStaff && (
+                    <td>
+                      <Link to={`/arriendos/${arriendo.id}#pagos-arriendo`}>
+                        {estadoArriendo ? (
+                          <span className={`badge badge--${estadoArriendo.claseBadge}`}>
+                            {estadoArriendo.label}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </Link>
+                    </td>
+                  )}
+                  {esStaff && (
+                    <td>
+                      <Link to={`/arriendos/${arriendo.id}#pagos-servicios`}>
+                        {estadoServicios ? (
+                          <span className={`badge badge--${estadoServicios.claseBadge}`}>
+                            {estadoServicios.label}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </Link>
+                    </td>
+                  )}
+                  {esStaff && (
+                    <td>
+                      {requerimientosAbiertos > 0 ? (
+                        <span className="badge badge--pendiente_revision">
+                          {requerimientosAbiertos} en curso
+                        </span>
+                      ) : (
+                        <span className="empty-state">Sin pendientes</span>
+                      )}
+                    </td>
+                  )}
+                  {esStaff && (
+                    <td>
+                      {alzaVisible ? (
+                        <span className={`badge badge--${alzaVisible.estado}`}>
+                          {ESTADO_ALZA_LABELS[alzaVisible.estado]} ·{' '}
+                          {formatFecha(alzaVisible.fechaIso)}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

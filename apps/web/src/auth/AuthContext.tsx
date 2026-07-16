@@ -10,6 +10,8 @@ interface LoginResponse {
 interface AuthContextValue {
   isAuthenticated: boolean;
   rol: RolUsuario | null;
+  organizacionId: string | null;
+  nombreCompleto: string | null;
   login: (email: string, password: string) => Promise<void>;
   registrarOrganizacion: (dto: {
     nombreOrganizacion: string;
@@ -23,39 +25,70 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function rolDesdeToken(): RolUsuario | null {
-  const token = getToken();
-  if (!token) return null;
-  const payload = decodeJwtPayload(token);
-  return (payload?.rol as RolUsuario) ?? null;
+interface DatosToken {
+  rol: RolUsuario | null;
+  organizacionId: string | null;
+  nombreCompleto: string | null;
+}
+
+function datosDesdeToken(token: string | null): DatosToken {
+  const payload = token ? decodeJwtPayload(token) : null;
+  return {
+    rol: (payload?.rol as RolUsuario) ?? null,
+    organizacionId: payload?.organizacionId ?? null,
+    nombreCompleto: payload?.nombreCompleto ?? null,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getToken()));
-  const [rol, setRol] = useState<RolUsuario | null>(rolDesdeToken);
+  const [rol, setRol] = useState<RolUsuario | null>(() => datosDesdeToken(getToken()).rol);
+  const [organizacionId, setOrganizacionId] = useState<string | null>(
+    () => datosDesdeToken(getToken()).organizacionId,
+  );
+  const [nombreCompleto, setNombreCompleto] = useState<string | null>(
+    () => datosDesdeToken(getToken()).nombreCompleto,
+  );
+
+  const aplicarToken = (accessToken: string) => {
+    setToken(accessToken);
+    setIsAuthenticated(true);
+    const datos = datosDesdeToken(accessToken);
+    setRol(datos.rol);
+    setOrganizacionId(datos.organizacionId);
+    setNombreCompleto(datos.nombreCompleto);
+  };
 
   const login = async (email: string, password: string) => {
     const { accessToken } = await api.post<LoginResponse>('/auth/login', { email, password });
-    setToken(accessToken);
-    setIsAuthenticated(true);
-    setRol(decodeJwtPayload(accessToken)?.rol as RolUsuario);
+    aplicarToken(accessToken);
   };
 
   const registrarOrganizacion: AuthContextValue['registrarOrganizacion'] = async (dto) => {
     const { accessToken } = await api.post<LoginResponse>('/auth/registro-organizacion', dto);
-    setToken(accessToken);
-    setIsAuthenticated(true);
-    setRol(decodeJwtPayload(accessToken)?.rol as RolUsuario);
+    aplicarToken(accessToken);
   };
 
   const logout = () => {
     clearToken();
     setIsAuthenticated(false);
     setRol(null);
+    setOrganizacionId(null);
+    setNombreCompleto(null);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, rol, login, registrarOrganizacion, logout }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        rol,
+        organizacionId,
+        nombreCompleto,
+        login,
+        registrarOrganizacion,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

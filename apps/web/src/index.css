@@ -1,13 +1,21 @@
 :root {
-  --color-bg: #f4f5f7;
+  --color-bg: #f6f7fb;
   --color-surface: #ffffff;
-  --color-border: #e2e4e9;
-  --color-text: #1b1f27;
-  --color-text-muted: #626878;
-  --color-primary: #2f6feb;
-  --color-primary-dark: #1f52b8;
-  --radius: 10px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --color-surface-muted: #f8fafc;
+  --color-border: #e4e7ee;
+  --color-text: #171a23;
+  --color-text-muted: #6b7280;
+  --color-primary: #4f46e5;
+  --color-primary-dark: #4338ca;
+  --color-primary-light: #eef2ff;
+  --radius-sm: 7px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow-sm: 0 1px 2px rgba(23, 26, 35, 0.06);
+  --shadow: 0 2px 8px rgba(23, 26, 35, 0.06), 0 1px 2px rgba(23, 26, 35, 0.05);
+  --shadow-md: 0 8px 24px rgba(23, 26, 35, 0.09), 0 2px 6px rgba(23, 26, 35, 0.06);
+  --shadow-primary: 0 4px 12px rgba(79, 70, 229, 0.25);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
 }
 
@@ -19,21 +27,64 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.2rem;
+}
+
+/* .page-header ya trae su propio margin-bottom (y el h1 vive dentro de un
+   flex junto a botones/selects), así que ahí no se necesita el margen
+   propio del h1 — evita duplicar el espacio. */
+.page-header h1,
+.auth-card h1 {
+  margin-bottom: 0;
+}
+
+.page-header h3 {
   margin: 0;
+  font-size: 1rem;
 }
 
 h2 {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0 0 0.5rem;
 }
 
 button {
   cursor: pointer;
   font-family: inherit;
+}
+
+/* Base más grande para inputs/selects/texto de formulario en toda la app —
+   el tamaño anterior (0.8-0.9rem en varios lados) quedaba chico. Las reglas
+   más específicas de abajo pueden afinar casos puntuales (celdas de tabla
+   editables, popovers de filtro), pero nunca por debajo de ~0.9rem. */
+input,
+select,
+textarea {
+  font-size: 1rem;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+::selection {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Auth screens */
@@ -43,6 +94,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
+  background: radial-gradient(circle at top, #eef1ff 0%, var(--color-bg) 55%);
 }
 
 .auth-card {
@@ -50,8 +102,9 @@ button {
   max-width: 380px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 2rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 2.2rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -70,30 +123,143 @@ button {
 }
 
 .auth-card input {
-  padding: 0.55rem 0.7rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.95rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-card input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
 .auth-card button {
   margin-top: 1.2rem;
-  padding: 0.6rem;
+  padding: 0.65rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--color-primary);
   color: white;
   font-weight: 600;
+  box-shadow: var(--shadow-primary);
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .auth-card button:hover {
   background: var(--color-primary-dark);
 }
 
+.auth-card button:active {
+  transform: translateY(1px);
+}
+
 .auth-card__error {
   color: #c0392b;
   font-size: 0.85rem;
   margin: 0.5rem 0 0;
+}
+
+.form-success {
+  color: #065f46;
+  background: #d1fae5;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0;
+}
+
+/* Página de Perfil: cada dato con más espacio y una etiqueta visible arriba,
+   en vez de líneas de texto apretadas una tras otra. */
+.perfil-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.perfil-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.perfil-field:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.perfil-field__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.perfil-field__value {
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+
+.perfil-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.perfil-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.perfil-form input {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.perfil-form input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.perfil-form button {
+  align-self: flex-start;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow-primary);
+}
+
+.perfil-form button:hover {
+  background: var(--color-primary-dark);
+}
+
+.perfil-form button:disabled {
+  opacity: 0.6;
+  box-shadow: none;
 }
 
 .auth-card__footer {
@@ -109,45 +275,150 @@ button {
   align-items: center;
   gap: 1.5rem;
   padding: 0.9rem 1.5rem;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(120deg, #4338ca, var(--color-primary) 55%, #8b5cf6);
+  box-shadow: 0 4px 16px rgba(67, 56, 202, 0.25);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .layout__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: white;
+}
+
+.layout__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.layout__logo svg {
+  width: 17px;
+  height: 17px;
 }
 
 .layout__nav {
   display: flex;
-  gap: 1rem;
+  gap: 0.3rem;
   flex: 1;
 }
 
 .layout__nav a {
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.78);
   text-decoration: none;
-  font-size: 0.9rem;
-  padding: 0.3rem 0;
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.layout__nav a:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .layout__nav a.active {
-  color: var(--color-primary);
-  font-weight: 600;
-  border-bottom: 2px solid var(--color-primary);
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  background: white;
 }
 
-.layout__logout {
+.user-menu {
+  position: relative;
+}
+
+.user-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: white;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.user-menu__trigger:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.user-menu__arrow {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.7rem;
+}
+
+.user-menu__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+}
+
+.user-menu__panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.4rem;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  background: transparent;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+  z-index: 20;
+}
+
+.user-menu__panel a,
+.user-menu__panel button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.user-menu__panel a:hover,
+.user-menu__panel button:hover {
+  background: var(--color-bg);
+  color: var(--color-primary);
 }
 
 .layout__content {
-  max-width: 1400px;
+  max-width: 1900px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.75rem 2rem;
+}
+
+/* Bloques de contenido consecutivos (ej. Pagos y Requerimientos en el
+   detalle de un arriendo) necesitan aire entre uno y otro — antes quedaban
+   pegados porque <section> no trae margen propio. */
+section + section {
+  margin-top: 2rem;
 }
 
 /* Shared page bits */
@@ -160,9 +431,10 @@ button {
 }
 
 .page-header select {
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+  font-weight: 500;
 }
 
 .page-header__actions {
@@ -185,60 +457,11 @@ button {
   color: var(--color-primary);
   text-decoration: none;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
-/* Card list (arriendos) */
-.card-list {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.card {
-  display: block;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 1rem 1.2rem;
-  text-decoration: none;
-  color: var(--color-text);
-}
-
-.card:hover {
-  border-color: var(--color-primary);
-}
-
-.card--static:hover {
-  border-color: var(--color-border);
-}
-
-.card__actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.8rem;
-}
-
-.card__actions button {
-  padding: 0.35rem 0.8rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.card__actions button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.card__actions button.danger {
-  color: #c0392b;
-}
-
-.card__actions button.danger:hover {
-  border-color: #c0392b;
-  background: #fee2e2;
+.back-link:hover {
+  text-decoration: underline;
 }
 
 .proveedores-panel {
@@ -250,22 +473,36 @@ button {
   gap: 0.5rem;
 }
 
+/* Cada registro (mantención, proveedor, arrendatario de auto, etc.) se
+   muestra como una tarjeta con sus campos etiquetados en vez de una fila de
+   valores sueltos: para gente sin mucha destreza tecnológica, un dato sin
+   etiqueta ("10.000 km", "123456") no se entiende a simple vista. */
+.proveedores-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.75rem;
+}
+
 .proveedores-panel__row {
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
+  flex-direction: column;
+  gap: 0.3rem;
   font-size: 0.85rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 0.9rem;
 }
 
 .proveedores-panel__tipo {
-  font-weight: 600;
-  min-width: 40px;
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .proveedores-panel__row-actions {
   display: flex;
   gap: 0.4rem;
-  margin-left: auto;
+  margin-top: 0.4rem;
 }
 
 .proveedores-panel__row-actions button {
@@ -283,6 +520,7 @@ button {
 
 .proveedores-panel__add {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }
@@ -305,10 +543,62 @@ button {
   font-weight: 600;
 }
 
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-like:hover {
+  background: var(--color-primary-dark);
+}
+
+.fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.fotos-grid__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.fotos-grid__item img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+}
+
 .inline-form__fieldset {
+  /* Los <fieldset> traen min-width: min-content por defecto del navegador,
+     así que no se achican con el padre aunque este sea más angosto — con
+     una fila interna que no hace wrap (ver .proveedores-panel__add) eso
+     empuja el fieldset (y su borde) fuera del modal, sin overflow visible
+     porque el modal no clippea. Hay que anularlo explícitamente. */
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0.8rem 1rem 1rem;
+}
+
+.inline-form__fieldset > * + * {
+  margin-top: 0.75rem;
 }
 
 .inline-form__fieldset legend {
@@ -318,21 +608,21 @@ button {
   padding: 0 0.3rem;
 }
 
-.card__title {
-  font-weight: 600;
-}
-
-.card__subtitle {
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  margin: 0.2rem 0 0.6rem;
-}
-
-.card__row {
+.fieldset-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9rem;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.fieldset-header legend {
+  padding: 0;
+}
+
+.fieldset-header button {
+  align-self: auto;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
 }
 
 /* Inline create forms */
@@ -340,7 +630,8 @@ button {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 1.2rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1.3rem;
   margin-bottom: 1.2rem;
   display: flex;
   flex-direction: column;
@@ -357,8 +648,52 @@ button {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.inline-form__fotos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
   font-size: 0.85rem;
   font-weight: 600;
+  padding: 0.9rem;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.inline-form__fotos--arrastrando {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.inline-form__fotos .button-like {
+  align-self: flex-start;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.9rem;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone--arrastrando {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.dropzone .button-like {
+  align-self: flex-start;
 }
 
 .inline-form input,
@@ -366,10 +701,19 @@ button {
 .inline-form textarea {
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.9rem;
   font-weight: 400;
   font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inline-form input:focus,
+.inline-form select:focus,
+.inline-form textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
 .inline-form textarea {
@@ -401,32 +745,35 @@ button {
   font-size: 0.85rem;
 }
 
-.inline-form button {
-  align-self: flex-start;
-  padding: 0.55rem 1.2rem;
-  border: none;
-  border-radius: 6px;
-  background: var(--color-primary);
-  color: white;
-  font-weight: 600;
-}
-
-.inline-form button:hover {
-  background: var(--color-primary-dark);
-}
-
+.inline-form button,
 .page-header button {
-  padding: 0.5rem 1rem;
+  align-self: flex-start;
+  padding: 0.6rem 1.3rem;
   border: none;
-  border-radius: 6px;
-  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--color-primary), #7c73f0);
   color: white;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-primary);
+  transition: filter 0.15s ease, transform 0.1s ease;
 }
 
+.inline-form button:hover,
 .page-header button:hover {
-  background: var(--color-primary-dark);
+  filter: brightness(1.08);
+}
+
+.inline-form button:active,
+.page-header button:active {
+  transform: translateY(1px);
+}
+
+.inline-form button:disabled,
+.page-header button:disabled {
+  opacity: 0.6;
+  box-shadow: none;
+  cursor: default;
 }
 
 /* Badges */
@@ -435,7 +782,8 @@ button {
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   background: #e5e7eb;
   color: #374151;
@@ -463,9 +811,65 @@ button {
   color: #92400e;
 }
 
+.badge--reabierto {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Reajuste de arriendo (calculado, no es un enum de la BD) */
+.badge--vencido {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge--proximo {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.alza-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.alza-banner::before {
+  content: '⚠';
+}
+
 .badge--atrasado {
   background: #fde68a;
   color: #92400e;
+}
+
+.badge--abono {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Clasificación de un pago dentro de su ciclo (ver clasificarTipoPago en
+   lib/periodos.ts): completo/final cierran el saldo, abono/parcial no. */
+.badge--completo {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge--parcial {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.badge--final {
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 /* Detail page */
@@ -480,7 +884,8 @@ button {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 1rem 1.2rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1.1rem 1.3rem;
 }
 
 .detail-card p {
@@ -489,11 +894,39 @@ button {
   color: var(--color-text-muted);
 }
 
+.detail-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.7rem;
+}
+
+.detail-card__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.detail-card__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.detail-card__value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   scrollbar-width: auto;
 }
 
@@ -506,13 +939,13 @@ button {
 }
 
 .table-wrap::-webkit-scrollbar-thumb {
-  background: #b8bcc6;
+  background: #c7cad3;
   border-radius: 999px;
   border: 3px solid var(--color-bg);
 }
 
 .table-wrap::-webkit-scrollbar-thumb:hover {
-  background: #9aa0ad;
+  background: #a6aab5;
 }
 
 .table {
@@ -523,29 +956,125 @@ button {
 .table th,
 .table td {
   text-align: left;
-  padding: 0.6rem 0.9rem;
+  padding: 0.65rem 0.9rem;
   border-bottom: 1px solid var(--color-border);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   white-space: nowrap;
 }
 
 .table th {
   color: var(--color-text-muted);
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  background: var(--color-surface-muted);
+}
+
+.table__filter-row th {
+  padding: 0.4rem 0.6rem;
+  background: var(--color-surface);
+}
+
+.table__filter-row input,
+.table__filter-row select {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.table__filter-row input:focus,
+.table__filter-row select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.table tbody tr {
+  transition: background 0.1s ease;
 }
 
 .table tbody tr:hover {
-  background: var(--color-bg);
+  background: var(--color-surface-muted);
 }
 
 .table tr:last-child td {
   border-bottom: none;
 }
 
+/* La última columna (casi siempre Acciones) queda fija a la derecha del
+   scroll horizontal, para que tablas anchas (muchas columnas) nunca dejen
+   los botones fuera de vista sin que el usuario sepa que hay más scroll. */
+.table th:last-child,
+.table td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--color-surface);
+  box-shadow: -6px 0 6px -4px rgba(23, 26, 35, 0.08);
+}
+
+.table th:last-child {
+  background: var(--color-surface-muted);
+}
+
+.table tbody tr:hover td:last-child {
+  background: var(--color-surface-muted);
+}
+
+.table__historial-row td:last-child {
+  background: var(--color-surface-muted);
+}
+
+/* La fila de detalle ocupa una sola celda (colSpan) con una tabla anidada
+   propia; hay que anular el "sticky" de columna final para que no quede
+   pegada a la derecha, tapando el resto del detalle. */
+.table td.table__historial-cell {
+  position: static;
+  box-shadow: none;
+  background: var(--color-surface-muted);
+  padding: 0;
+}
+
+.historial-detalle {
+  padding: 0.9rem 1rem 0.9rem 2.2rem;
+}
+
+.historial-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.historial-tabla th,
+.historial-tabla td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  white-space: normal;
+  color: var(--color-text-muted);
+}
+
+.historial-tabla th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.historial-tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .table__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
 }
 
@@ -571,6 +1100,210 @@ button {
 .table__actions button.danger:hover {
   border-color: #c0392b;
   background: #fee2e2;
+}
+
+/* Editar/Eliminar como ícono: mismo target de clic que el botón de texto que
+   reemplazan, pero sin ocupar tanto ancho en filas de tabla o listas. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  flex: none;
+}
+
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.icon-button--danger {
+  color: #c0392b;
+}
+
+.icon-button--danger:hover {
+  border-color: #c0392b;
+  background: #fee2e2;
+  color: #c0392b;
+}
+
+.icon-button--small {
+  width: 28px;
+  height: 28px;
+}
+
+.icon-button--small svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Estado de revisión de un pago (pendiente / aprobado / rechazado): un
+   icono redondo en vez de texto, para que se lea de un vistazo en la tabla. */
+.icono-revision {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  flex: none;
+}
+
+.icono-revision svg {
+  width: 15px;
+  height: 15px;
+}
+
+.icono-revision--pendiente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.icono-revision--aprobado {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.table__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.date-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.date-input input[type='text'] {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Especificidad extra (.date-input + button + clase) para ganarle a las
+   reglas genéricas ".inline-form button" / ".page-header button", que si no
+   pintan este botón con su gradiente morado por defecto. */
+.date-input button.date-input__calendario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  flex: none;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.date-input button.date-input__calendario:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  filter: none;
+}
+
+.date-input__calendario svg {
+  width: 18px;
+  height: 18px;
+}
+
+.date-input__nativo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.historial-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  cursor: pointer;
+}
+
+.historial-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+.historial-toggle:hover,
+.historial-toggle--abierto {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.table__historial-row td {
+  background: var(--color-surface-muted, #f8fafc);
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
+  white-space: normal;
+}
+
+.table__historial-row td:first-child {
+  padding-left: 1.6rem;
+}
+
+.table__cell-truncate {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.table__historial-row .table__cell-truncate {
+  white-space: nowrap;
+}
+
+.table td.table__cell-wrap {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Fuerza que las columnas quepan en el ancho disponible sin scroll
+   horizontal: las columnas angostas llevan un width fijo (inline) y la
+   que no tiene width definido (Descripción) absorbe el resto y crece
+   hacia abajo en vez de forzar overflow. */
+.table--fixed {
+  table-layout: fixed;
 }
 
 .th-sortable {
@@ -601,14 +1334,14 @@ button {
   padding: 0.3rem 0.4rem;
   border: 1px solid var(--color-primary);
   border-radius: 4px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-family: inherit;
 }
 
 .cell-select {
   border: 1px solid transparent;
   background: transparent;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-family: inherit;
   font-weight: 600;
   padding: 0.2rem 0.3rem;
@@ -618,6 +1351,125 @@ button {
 
 .cell-select:hover {
   border-color: var(--color-border);
+}
+
+/* Estas van después de .cell-select para que su fondo/radio de píldora
+   no sea pisado por el `background: transparent` de .cell-select. */
+.cell-select.badge {
+  border-radius: 999px;
+}
+
+/* Estado de propiedad / auto */
+.badge--disponible {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge--arrendada,
+.badge--arrendado {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge--en_mantencion {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge--usufructo {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+/* Tipo de propiedad */
+.badge--casa {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.badge--departamento {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.badge--habitacion {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.badge--terreno {
+  background: #ecfccb;
+  color: #3f6212;
+}
+
+/* Urgencia de requerimiento */
+.badge--critica {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge--media {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.badge--baja {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+/* Tipo de reparación de requerimiento */
+.badge--estructural {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.badge--locativa {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+/* Estado de requerimiento (rechazado y reabierto reusan los badges ya
+   definidos más arriba, ya que sus nombres en minúscula coinciden). */
+.badge--pendiente_revision {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge--revision_agendada {
+  background: #cffafe;
+  color: #155e75;
+}
+
+.badge--en_revision {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.badge--resuelto {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Tipo de persona */
+.badge--administrador {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.badge--propietario {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge--tecnico {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.badge--arrendatario {
+  background: #d1fae5;
+  color: #065f46;
 }
 
 /* Resumen de pagos */
@@ -641,10 +1493,17 @@ button {
   color: var(--color-primary);
 }
 
+.pagos-arrendatario__categoria {
+  margin-top: 1.2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--color-border);
+}
+
 .stat-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 1.2rem;
   display: flex;
   flex-direction: column;
@@ -652,9 +1511,10 @@ button {
 }
 
 .stat-card--total {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary), #6f66ec);
   color: white;
   border: none;
+  box-shadow: var(--shadow-primary);
 }
 
 .stat-card--total .stat-card__label {
@@ -680,4 +1540,280 @@ button {
 
 .stat-card--total .stat-card__count {
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Vista pública de propiedades disponibles */
+.public-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.public-page__header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.public-page__header h1 {
+  font-size: 2rem;
+  margin-bottom: 0;
+}
+
+.public-page__header p {
+  color: var(--color-text-muted);
+  margin: 0.4rem 0 0;
+}
+
+.public-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.public-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--color-text);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.public-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.public-card__foto {
+  height: 170px;
+  background: var(--color-surface-muted);
+}
+
+.public-card__foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.public-card__foto-vacia {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.public-card__body {
+  padding: 1rem 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.public-card__body h2 {
+  margin: 0.3rem 0 0;
+}
+
+.public-card__ubicacion {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.public-card__ubicacion--detalle {
+  font-size: 1rem;
+  margin: 0.3rem 0 1rem;
+}
+
+.public-card__caracteristicas {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0.2rem 0 0;
+}
+
+.public-card__precio {
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  margin: 0.4rem 0 0;
+}
+
+.public-card__precio--grande {
+  font-size: 1.3rem;
+}
+
+.public-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.public-gallery img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+/* Modal (popup) para formularios de "registrar/crear" */
+.modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 4rem 1.5rem;
+  z-index: 50;
+}
+
+.modal__panel {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 640px;
+  padding: 1.5rem;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.modal__header h2 {
+  margin: 0;
+}
+
+.modal__close {
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 0.1rem 0.5rem;
+  border-radius: 6px;
+}
+
+.modal__close:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.modal__body .inline-form {
+  margin-bottom: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* ============================================================
+   Responsive / celular — hasta acá todo el CSS asumía escritorio.
+   Este bloque ajusta lo que realmente se rompe en una pantalla angosta:
+   el header con 6 links de navegación, los modales, y el padding general.
+   Las grillas (inline-form__grid, detail-grid, stat-grid, public-grid,
+   fotos-grid) ya usan auto-fit/minmax y se acomodan solas sin tocar nada.
+   ============================================================ */
+@media (max-width: 768px) {
+  .layout__header {
+    flex-wrap: wrap;
+    row-gap: 0.6rem;
+    padding: 0.7rem 1rem;
+  }
+
+  .layout__brand {
+    font-size: 0.95rem;
+  }
+
+  .layout__nav {
+    order: 3;
+    flex-basis: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -1rem;
+    padding: 0 1rem;
+  }
+
+  .layout__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .layout__nav a {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .user-menu__nombre {
+    display: inline-block;
+    max-width: 32vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+
+  .layout__content {
+    padding: 1.1rem 0.9rem;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    row-gap: 0.6rem;
+  }
+
+  .page-header__actions {
+    flex-wrap: wrap;
+  }
+
+  /* Modal casi de pantalla completa, sin desperdiciar espacio en el borde. */
+  .modal__backdrop {
+    padding: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .modal__panel {
+    padding: 1.1rem;
+    max-height: calc(100vh - 1.5rem);
+    overflow-y: auto;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.55rem 0.65rem;
+  }
+
+  .detail-card,
+  .stat-card,
+  .inline-form {
+    padding: 1rem;
+  }
+
+  /* Vista pública de propiedades: la ve gente externa desde el celular con
+     más frecuencia que el resto de la app. */
+  .public-page {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .public-page__header h1 {
+    font-size: 1.5rem;
+  }
+
+  .public-gallery img {
+    height: 160px;
+  }
 }

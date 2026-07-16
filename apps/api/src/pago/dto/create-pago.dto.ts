@@ -9,7 +9,7 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
-import { EstadoPago } from '@prisma/client';
+import { CategoriaPago, EstadoPago, TipoProveedor } from '@prisma/client';
 
 export const ARRIENDO_TIPOS = ['propiedad', 'auto'] as const;
 export type ArriendoTipo = (typeof ARRIENDO_TIPOS)[number];
@@ -51,10 +51,22 @@ export class CreatePagoDto {
   estado?: EstadoPago;
 
   @IsOptional()
+  @IsIn(['ARRIENDO', 'SERVICIOS_BASICOS'])
+  categoria?: CategoriaPago;
+
+  @IsOptional()
+  @IsIn(['AGUA', 'LUZ', 'GAS'])
+  tipoServicio?: TipoProveedor;
+
+  @IsOptional()
   @IsString()
   comprobanteFotoId?: string;
 
   @IsOptional()
   @IsBoolean()
   aprobado?: boolean;
+
+  @IsOptional()
+  @IsString()
+  motivoRechazo?: string;
 }

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { RolUsuario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { CreateArriendoPropiedadDto } from './dto/create-arriendo-propiedad.dto';
@@ -82,7 +83,23 @@ export class ArriendoPropiedadService {
       throw new NotFoundException('Arriendo no encontrado');
     }
 
-    return arriendo;
+    if (!this.tenant.esArrendatario) {
+      return arriendo;
+    }
+
+    // El arrendatario no necesita ver sus propios datos bajo "arrendatario":
+    // le interesa saber a quién contactar, es decir el dueño/administrador
+    // de la organización dueña de la propiedad.
+    const usuarioArrendador = await this.prisma.usuario.findFirst({
+      where: {
+        organizacionId: this.tenant.organizacionId,
+        rol: { in: [RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO] },
+      },
+      include: { persona: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return { ...arriendo, arrendador: usuarioArrendador?.persona ?? null };
   }
 
   async update(id: string, dto: UpdateArriendoPropiedadDto) {

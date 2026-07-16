@@ -3,18 +3,25 @@ import {
   IsArray,
   IsDate,
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
+import { RolUsuario } from '@prisma/client';
 import { CreatePersonaRecomendacionDto } from './create-persona-recomendacion.dto';
 
 export class CreatePersonaDto {
   @IsString()
   nombreCompleto: string;
 
+  @IsOptional()
   @IsString()
-  rut: string;
+  rut?: string;
+
+  @IsOptional()
+  @IsEnum(RolUsuario)
+  tipoPersona?: RolUsuario;
 
   @IsOptional()
   @Type(() => Date)

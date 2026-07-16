@@ -25,6 +25,15 @@ export class ConfiguracionMantencionController {
     return this.configuracionMantencionService.create(dto);
   }
 
+  // El arrendatario puede consultar (solo lectura) las configuraciones de
+  // mantención para poder leer las columnas de la tabla de mantenciones de
+  // su auto — el resto de acciones sigue siendo solo staff.
+  @Roles(
+    RolUsuario.ADMINISTRADOR,
+    RolUsuario.PROPIETARIO,
+    RolUsuario.TECNICO,
+    RolUsuario.ARRENDATARIO,
+  )
   @Get()
   findAll() {
     return this.configuracionMantencionService.findAll();

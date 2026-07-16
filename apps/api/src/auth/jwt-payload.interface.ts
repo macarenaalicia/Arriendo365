@@ -6,6 +6,7 @@ export interface JwtPayload {
   organizacionId: string;
   personaId: string;
   rol: RolUsuario;
+  nombreCompleto: string;
 }
 
 export interface AuthenticatedRequest extends Request {

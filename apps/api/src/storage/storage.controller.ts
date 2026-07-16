@@ -4,13 +4,18 @@ import { R2Service } from './r2.service';
 import { CrearUrlSubidaDto } from './dto/crear-url-subida.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 
-@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO, RolUsuario.ARRENDATARIO)
 @Controller('storage')
 export class StorageController {
   constructor(private readonly r2Service: R2Service) {}
 
   @Post('presigned-upload')
   crearUrlSubida(@Body() dto: CrearUrlSubidaDto) {
-    return this.r2Service.crearUrlSubida(dto.carpeta, dto.nombreArchivo, dto.contentType);
+    return this.r2Service.crearUrlSubida(
+      dto.carpeta,
+      dto.nombreArchivo,
+      dto.contentType,
+      dto.tamanioBytes,
+    );
   }
 }

@@ -55,6 +55,7 @@ export class AuthService {
       organizacionId: organizacion.id,
       personaId: usuario.personaId,
       rol: usuario.rol,
+      nombreCompleto: dto.nombreCompleto,
     });
   }
 
@@ -81,6 +82,7 @@ export class AuthService {
       organizacionId: usuario.organizacionId,
       personaId: usuario.personaId,
       rol: usuario.rol,
+      nombreCompleto: persona.nombreCompleto,
     });
   }
 

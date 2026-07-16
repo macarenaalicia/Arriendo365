@@ -17,7 +17,13 @@ export class MantencionAutoService {
 
   private async assertAutoEnOrganizacion(autoId: string) {
     const auto = await this.prisma.auto.findFirst({
-      where: { id: autoId, organizacionId: this.tenant.organizacionId },
+      where: {
+        id: autoId,
+        organizacionId: this.tenant.organizacionId,
+        ...(this.tenant.esArrendatario
+          ? { arriendos: { some: { arrendatarioId: this.tenant.personaId } } }
+          : {}),
+      },
     });
     if (!auto) {
       throw new NotFoundException('Auto no encontrado');
@@ -43,6 +49,8 @@ export class MantencionAutoService {
         kilometrajeActual: dto.kilometrajeActual,
         kilometrajeProxima: dto.kilometrajeProxima,
         fechaMantencion: dto.fechaMantencion,
+        costo: dto.costo,
+        medioPago: dto.medioPago,
         items: { create: dto.configuracionIds.map((configuracionId) => ({ configuracionId })) },
       },
       include: DETALLE_INCLUDE,
@@ -90,6 +98,11 @@ export class MantencionAutoService {
           kilometrajeActual: dto.kilometrajeActual,
           kilometrajeProxima: dto.kilometrajeProxima,
           fechaMantencion: dto.fechaMantencion,
+          costo: dto.costo,
+          medioPago: dto.medioPago,
+          estadoPago: dto.estadoPago,
+          aprobado: dto.aprobado,
+          motivoRechazo: dto.motivoRechazo,
           items: dto.configuracionIds
             ? { create: dto.configuracionIds.map((configuracionId) => ({ configuracionId })) }
             : undefined,

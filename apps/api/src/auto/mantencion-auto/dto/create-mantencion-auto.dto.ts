@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsDate, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDate,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export class CreateMantencionAutoDto {
   @IsArray()
@@ -19,4 +29,13 @@ export class CreateMantencionAutoDto {
   @Type(() => Date)
   @IsDate()
   fechaMantencion: Date;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costo?: number;
+
+  @IsOptional()
+  @IsString()
+  medioPago?: string;
 }

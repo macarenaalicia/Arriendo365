@@ -23,10 +23,15 @@ import { DocumentoModule } from './documento/documento.module';
 import { FotoModule } from './foto/foto.module';
 import { ChatModule } from './chat/chat.module';
 import { UsuarioModule } from './usuario/usuario.module';
+import { PublicPropiedadesModule } from './public-propiedades/public-propiedades.module';
+import { PerfilModule } from './perfil/perfil.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
+    }),
     PrismaModule,
     TenantModule,
     AuthModule,
@@ -44,6 +49,8 @@ import { UsuarioModule } from './usuario/usuario.module';
     FotoModule,
     ChatModule,
     UsuarioModule,
+    PublicPropiedadesModule,
+    PerfilModule,
   ],
   controllers: [AppController],
   providers: [

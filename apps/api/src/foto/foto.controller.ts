@@ -5,7 +5,7 @@ import { CreateFotoDto } from './dto/create-foto.dto';
 import { FindFotosDto } from './dto/find-fotos.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 
-@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO, RolUsuario.ARRENDATARIO)
 @Controller('fotos')
 export class FotoController {
   constructor(private readonly fotoService: FotoService) {}

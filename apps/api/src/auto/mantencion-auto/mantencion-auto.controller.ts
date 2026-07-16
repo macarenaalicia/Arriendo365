@@ -25,11 +25,25 @@ export class MantencionAutoController {
     return this.mantencionAutoService.create(autoId, dto);
   }
 
+  // El arrendatario puede consultar (solo lectura) las mantenciones del auto
+  // que tiene arrendado — crear/editar/eliminar sigue siendo solo staff.
+  @Roles(
+    RolUsuario.ADMINISTRADOR,
+    RolUsuario.PROPIETARIO,
+    RolUsuario.TECNICO,
+    RolUsuario.ARRENDATARIO,
+  )
   @Get()
   findAll(@Param('autoId') autoId: string) {
     return this.mantencionAutoService.findAll(autoId);
   }
 
+  @Roles(
+    RolUsuario.ADMINISTRADOR,
+    RolUsuario.PROPIETARIO,
+    RolUsuario.TECNICO,
+    RolUsuario.ARRENDATARIO,
+  )
   @Get(':id')
   findOne(@Param('autoId') autoId: string, @Param('id') id: string) {
     return this.mantencionAutoService.findOne(autoId, id);

@@ -1,5 +1,5 @@
 import { IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
-import { EstadoPago } from '@prisma/client';
+import { CategoriaPago, EstadoPago } from '@prisma/client';
 import { ARRIENDO_TIPOS, type ArriendoTipo } from './create-pago.dto';
 
 export class FindPagosDto {
@@ -14,4 +14,8 @@ export class FindPagosDto {
   @IsOptional()
   @IsEnum(EstadoPago)
   estado?: EstadoPago;
+
+  @IsOptional()
+  @IsEnum(CategoriaPago)
+  categoria?: CategoriaPago;
 }

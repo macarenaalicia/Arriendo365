@@ -54,6 +54,11 @@ enum EstadoPago {
   RECHAZADO
 }
 
+enum CategoriaPago {
+  ARRIENDO
+  SERVICIOS_BASICOS
+}
+
 enum UrgenciaRequerimiento {
   CRITICA
   MEDIA
@@ -65,6 +70,8 @@ enum EstadoRequerimiento {
   REVISION_AGENDADA
   EN_REVISION
   RESUELTO
+  RECHAZADO
+  REABIERTO
 }
 
 enum TipoReparacion {
@@ -146,17 +153,26 @@ model Usuario {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  actualizacionesRequerimiento RequerimientoActualizacion[]
+
   @@map("usuario")
 }
 
 // ---------- PERSONA (entidad transversal) ----------
 
 model Persona {
-  id                    String    @id @default(uuid())
+  id                    String       @id @default(uuid())
   organizacionId        String
   organizacion          Organizacion @relation(fields: [organizacionId], references: [id])
   nombreCompleto        String
-  rut                   String
+  // Un técnico (tipoPersona TECNICO) solo exige nombre completo: no se le
+  // pide RUT ni el resto de los datos legales que sí necesita un
+  // arrendatario/codeudor.
+  rut                   String?
+  // Categoriza a la persona (ej. técnico, arrendatario) independiente de si
+  // tiene o no un Usuario con acceso a la plataforma — un técnico no
+  // necesita login para poder ser asignado a un requerimiento.
+  tipoPersona           RolUsuario?
   fechaNacimiento       DateTime?
   direccion             String?
   telefono              String?
@@ -167,15 +183,16 @@ model Persona {
   licenciaFrontalFotoId String?
   licenciaTraseraFotoId String?
   contratoTrabajoDocId  String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   recomendaciones         PersonaRecomendacion[]
   usuarios                Usuario[]
-  arriendosPropiedad      ArriendoPropiedad[] @relation("ArrendatarioPropiedad")
-  codeudorDe              ArriendoPropiedad[] @relation("CodeudorPropiedad")
+  arriendosPropiedad      ArriendoPropiedad[]          @relation("ArrendatarioPropiedad")
+  codeudorDe              ArriendoPropiedad[]          @relation("CodeudorPropiedad")
   arriendosAuto           ArriendoAuto[]
   requerimientosAsignados Requerimiento[]
+  requerimientoHistorial  RequerimientoActualizacion[]
   mensajes                ChatMensaje[]
 
   @@unique([organizacionId, rut])
@@ -226,30 +243,33 @@ model Foto {
 // ---------- PROPIEDADES ----------
 
 model Propiedad {
-  id                    String          @id @default(uuid())
-  organizacionId        String
-  organizacion          Organizacion    @relation(fields: [organizacionId], references: [id])
-  rol                   String
-  calle                 String
-  numero                String
-  numeroDepartamento    String?
-  sector                String?
-  ciudad                String
-  region                String
-  tipo                  TipoPropiedad
-  nHabitaciones         Int
-  nBanos                Int
-  bodega                Boolean         @default(false)
-  bodegaNumero          String?
-  estacionamiento       Boolean         @default(false)
-  estacionamientoNumero String?
-  mt2Totales            Decimal         @db.Decimal(8, 2)
-  mt2Construidos        Decimal         @db.Decimal(8, 2)
-  descripcion           String?
-  estado                EstadoPropiedad @default(DISPONIBLE)
-  pagaContribuciones    Boolean         @default(false)
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  id                     String          @id @default(uuid())
+  organizacionId         String
+  organizacion           Organizacion    @relation(fields: [organizacionId], references: [id])
+  rol                    String
+  calle                  String
+  numero                 String
+  numeroDepartamento     String?
+  sector                 String?
+  ciudad                 String
+  region                 String
+  tipo                   TipoPropiedad
+  nHabitaciones          Int
+  nBanos                 Int
+  bodega                 Boolean         @default(false)
+  bodegaNumero           String?
+  estacionamiento        Boolean         @default(false)
+  estacionamientoNumero  String?
+  mt2Totales             Decimal         @db.Decimal(8, 2)
+  mt2Construidos         Decimal         @db.Decimal(8, 2)
+  descripcion            String?
+  estado                 EstadoPropiedad @default(DISPONIBLE)
+  pagaContribuciones     Boolean         @default(false)
+  // Precio de referencia para publicar la propiedad en la vista pública
+  // mientras está DISPONIBLE (no es el monto de un contrato de arriendo).
+  precioArriendoEsperado Decimal?        @db.Decimal(10, 2)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
   proveedores Proveedor[]
   arriendos   ArriendoPropiedad[]
@@ -315,19 +335,24 @@ model ArriendoInventario {
 // Pago es polimórfico entre ArriendoPropiedad y ArriendoAuto (arriendoTipo + arriendoId).
 // Sin relación formal en Prisma por el mismo motivo que Documento/Foto: se valida en la app.
 model Pago {
-  id                String     @id @default(uuid())
+  id                String         @id @default(uuid())
   arriendoTipo      String // "propiedad" | "auto"
   arriendoId        String
   periodo           DateTime
   fechaComprometida DateTime
   fechaPagoReal     DateTime?
-  monto             Decimal    @db.Decimal(10, 2)
+  monto             Decimal        @db.Decimal(10, 2)
   medioPago         String?
-  esAbono           Boolean    @default(false)
-  estado            EstadoPago @default(PENDIENTE)
+  esAbono           Boolean        @default(false)
+  estado            EstadoPago     @default(PENDIENTE)
+  categoria         CategoriaPago  @default(ARRIENDO)
+  // Solo aplica cuando categoria = SERVICIOS_BASICOS; reutiliza el mismo
+  // enum que Proveedor.tipo para no duplicar el listado de servicios.
+  tipoServicio      TipoProveedor?
   comprobanteFotoId String?
   aprobado          Boolean?
-  createdAt         DateTime   @default(now())
+  motivoRechazo     String?
+  createdAt         DateTime       @default(now())
 
   @@index([arriendoTipo, arriendoId])
   @@map("pago")
@@ -354,10 +379,33 @@ model Requerimiento {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
-  presupuestos RequerimientoPresupuesto[]
-  gastos       Gasto[]
+  presupuestos    RequerimientoPresupuesto[]
+  gastos          Gasto[]
+  actualizaciones RequerimientoActualizacion[]
 
   @@map("requerimiento")
+}
+
+// Guarda el estado ANTERIOR del requerimiento justo antes de cada edición
+// (no una descripción del cambio), para poder comparar a la vista la fila
+// vigente contra sus versiones previas usando las mismas columnas.
+model RequerimientoActualizacion {
+  id                String                @id @default(uuid())
+  requerimientoId   String
+  requerimiento     Requerimiento         @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
+  urgencia          UrgenciaRequerimiento
+  estado            EstadoRequerimiento
+  tipoReparacion    TipoReparacion
+  tecnicoId         String?
+  tecnico           Persona?              @relation(fields: [tecnicoId], references: [id])
+  notasArrendatario String?
+  detalleResolucion String?
+  nota              String?
+  usuarioId         String?
+  usuario           Usuario?              @relation(fields: [usuarioId], references: [id])
+  createdAt         DateTime              @default(now())
+
+  @@map("requerimiento_actualizacion")
 }
 
 model RequerimientoPresupuesto {
@@ -427,12 +475,20 @@ model ConfiguracionMantencion {
 }
 
 model MantencionAuto {
-  id                 String   @id @default(uuid())
+  id                 String     @id @default(uuid())
   autoId             String
-  auto               Auto     @relation(fields: [autoId], references: [id])
+  auto               Auto       @relation(fields: [autoId], references: [id])
   kilometrajeActual  Int
   kilometrajeProxima Int?
   fechaMantencion    DateTime
+  // Costo de la mantención, con el mismo flujo de revisión que los pagos de
+  // arriendo (pendiente/aprobado/rechazado) — quien la registra no queda
+  // aprobada automáticamente, otro staff la revisa después.
+  costo              Decimal?   @db.Decimal(10, 2)
+  medioPago          String?
+  estadoPago         EstadoPago @default(PENDIENTE)
+  aprobado           Boolean?
+  motivoRechazo      String?
 
   items MantencionAutoItem[]
 

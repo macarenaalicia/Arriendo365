@@ -14,11 +14,13 @@ export class PersonaService {
   async create(dto: CreatePersonaDto) {
     const { recomendaciones, ...datos } = dto;
 
-    const existente = await this.prisma.persona.findFirst({
-      where: { organizacionId: this.tenant.organizacionId, rut: dto.rut },
-    });
-    if (existente) {
-      throw new ConflictException('Ya existe una persona con ese RUT en la organización');
+    if (dto.rut) {
+      const existente = await this.prisma.persona.findFirst({
+        where: { organizacionId: this.tenant.organizacionId, rut: dto.rut },
+      });
+      if (existente) {
+        throw new ConflictException('Ya existe una persona con ese RUT en la organización');
+      }
     }
 
     return this.prisma.persona.create({

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 export const ENTIDAD_TIPOS = [
   'propiedad',
@@ -14,7 +15,10 @@ export type EntidadTipo = (typeof ENTIDAD_TIPOS)[number];
 
 @Injectable()
 export class EntidadResolverService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenant: TenantContextService,
+  ) {}
 
   async assertEntidadEnOrganizacion(
     entidadTipo: EntidadTipo,
@@ -47,10 +51,24 @@ export class EntidadResolverService {
         return this.prisma.arriendoAuto.findFirst({
           where: { id: entidadId, auto: { organizacionId } },
         });
-      case 'requerimiento':
+      case 'requerimiento': {
+        // Un arrendatario solo puede adjuntar/ver fotos de requerimientos de
+        // arriendos donde él es el arrendatario o el codeudor.
+        const filtroPropio = this.tenant.esArrendatario
+          ? {
+              OR: [
+                { arrendatarioId: this.tenant.personaId },
+                { codeudorId: this.tenant.personaId },
+              ],
+            }
+          : {};
         return this.prisma.requerimiento.findFirst({
-          where: { id: entidadId, arriendoPropiedad: { propiedad: { organizacionId } } },
+          where: {
+            id: entidadId,
+            arriendoPropiedad: { propiedad: { organizacionId }, ...filtroPropio },
+          },
         });
+      }
     }
   }
 }

@@ -48,6 +48,7 @@ export class ArriendoAutoService {
         auto: { organizacionId: this.tenant.organizacionId },
         estado: query.estado,
         autoId: query.autoId,
+        arrendatarioId: this.tenant.esArrendatario ? this.tenant.personaId : undefined,
       },
       include: DETALLE_INCLUDE,
       orderBy: { createdAt: 'desc' },
@@ -56,7 +57,11 @@ export class ArriendoAutoService {
 
   async findOne(id: string) {
     const arriendo = await this.prisma.arriendoAuto.findFirst({
-      where: { id, auto: { organizacionId: this.tenant.organizacionId } },
+      where: {
+        id,
+        auto: { organizacionId: this.tenant.organizacionId },
+        arrendatarioId: this.tenant.esArrendatario ? this.tenant.personaId : undefined,
+      },
       include: DETALLE_INCLUDE,
     });
 

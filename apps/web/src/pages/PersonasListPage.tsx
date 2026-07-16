@@ -1,19 +1,29 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import type { Persona, RolUsuario, Usuario } from '../api/types';
 import { ddmmyyyyToIso, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
+import { Modal } from '../components/Modal';
+import { IconEditar, IconEliminar, IconLlave } from '../components/icons';
 
 const FORM_INICIAL = {
   nombreCompleto: '',
   rut: '',
+  tipoPersona: '' as RolUsuario | '',
   email: '',
   telefono: '',
   direccion: '',
   fechaNacimiento: '',
 };
 
-const ROLES: RolUsuario[] = ['ADMINISTRADOR', 'PROPIETARIO', 'ARRENDATARIO', 'TECNICO'];
+const ROLES: RolUsuario[] = ['ARRENDATARIO', 'TECNICO', 'ADMINISTRADOR', 'PROPIETARIO'];
+
+const TIPO_PERSONA_LABELS: Record<RolUsuario, string> = {
+  ADMINISTRADOR: 'Administrador',
+  PROPIETARIO: 'Propietario',
+  ARRENDATARIO: 'Arrendatario',
+  TECNICO: 'Técnico',
+};
 
 const ACCESO_FORM_INICIAL = {
   rol: 'ARRENDATARIO' as RolUsuario,
@@ -31,7 +41,7 @@ export function PersonasListPage() {
   const [saving, setSaving] = useState(false);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [accesoPersonaId, setAccesoPersonaId] = useState<string | null>(null);
   const [accesoForm, setAccesoForm] = useState(ACCESO_FORM_INICIAL);
   const [accesoError, setAccesoError] = useState<string | null>(null);
   const [savingAcceso, setSavingAcceso] = useState(false);
@@ -67,7 +77,8 @@ export function PersonasListPage() {
   const abrirEdicion = (persona: Persona) => {
     setForm({
       nombreCompleto: persona.nombreCompleto,
-      rut: persona.rut,
+      rut: persona.rut ?? '',
+      tipoPersona: persona.tipoPersona ?? '',
       email: persona.email ?? '',
       telefono: persona.telefono ?? '',
       direccion: persona.direccion ?? '',
@@ -94,7 +105,8 @@ export function PersonasListPage() {
     try {
       const payload = {
         nombreCompleto: form.nombreCompleto,
-        rut: form.rut,
+        rut: form.rut || undefined,
+        tipoPersona: form.tipoPersona || undefined,
         email: form.email || undefined,
         telefono: form.telefono || undefined,
         direccion: form.direccion || undefined,
@@ -122,23 +134,23 @@ export function PersonasListPage() {
     cargar();
   };
 
-  const toggleAcceso = (personaId: string) => {
-    if (expandedId === personaId) {
-      setExpandedId(null);
-      return;
-    }
-    setExpandedId(personaId);
+  const abrirAcceso = (personaId: string) => {
+    setAccesoPersonaId(personaId);
     setAccesoError(null);
     const usuario = usuarios.find((u) => u.personaId === personaId);
     setAccesoForm(
-      usuario
-        ? { rol: usuario.rol, activo: usuario.activo, password: '' }
-        : ACCESO_FORM_INICIAL,
+      usuario ? { rol: usuario.rol, activo: usuario.activo, password: '' } : ACCESO_FORM_INICIAL,
     );
   };
 
-  const handleGuardarAcceso = async (personaId: string) => {
-    const usuario = usuarios.find((u) => u.personaId === personaId);
+  const cerrarAcceso = () => {
+    setAccesoPersonaId(null);
+    setAccesoError(null);
+  };
+
+  const handleGuardarAcceso = async () => {
+    if (!accesoPersonaId) return;
+    const usuario = usuarios.find((u) => u.personaId === accesoPersonaId);
 
     if (!usuario && !accesoForm.password) {
       setAccesoError('Define una contraseña para crear el acceso.');
@@ -159,13 +171,13 @@ export function PersonasListPage() {
         });
       } else {
         await api.post('/usuarios', {
-          personaId,
+          personaId: accesoPersonaId,
           rol: accesoForm.rol,
           password: accesoForm.password,
         });
       }
       cargarUsuarios();
-      setAccesoForm({ ...accesoForm, password: '' });
+      cerrarAcceso();
     } catch (err) {
       setAccesoError(err instanceof ApiError ? err.message : 'No se pudo guardar el acceso');
     } finally {
@@ -176,7 +188,7 @@ export function PersonasListPage() {
   const handleQuitarAcceso = async (usuarioId: string) => {
     if (!confirm('¿Quitar el acceso al sistema de esta persona?')) return;
     await api.delete(`/usuarios/${usuarioId}`);
-    setExpandedId(null);
+    cerrarAcceso();
     cargarUsuarios();
   };
 
@@ -184,12 +196,13 @@ export function PersonasListPage() {
     <div>
       <div className="page-header">
         <h1>Personas</h1>
-        <button type="button" onClick={showForm ? cerrarForm : abrirCreacion}>
-          {showForm ? 'Cancelar' : '+ Nueva persona'}
+        <button type="button" onClick={abrirCreacion}>
+          + Nueva persona
         </button>
       </div>
 
       {showForm && (
+        <Modal titulo={editingId ? 'Editar persona' : 'Nueva persona'} onClose={cerrarForm}>
         <form className="inline-form" onSubmit={handleSubmit}>
           <div className="inline-form__grid">
             <label>
@@ -201,12 +214,28 @@ export function PersonasListPage() {
               />
             </label>
             <label>
-              RUT
+              RUT{form.tipoPersona === 'TECNICO' ? ' (opcional)' : ''}
               <input
-                required
+                required={form.tipoPersona !== 'TECNICO'}
                 value={form.rut}
                 onChange={(e) => setForm({ ...form, rut: e.target.value })}
               />
+            </label>
+            <label>
+              Tipo de persona
+              <select
+                value={form.tipoPersona}
+                onChange={(e) =>
+                  setForm({ ...form, tipoPersona: e.target.value as RolUsuario | '' })
+                }
+              >
+                <option value="">Sin especificar</option>
+                {ROLES.map((rol) => (
+                  <option key={rol} value={rol}>
+                    {TIPO_PERSONA_LABELS[rol]}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Email
@@ -245,6 +274,7 @@ export function PersonasListPage() {
             {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Guardar persona'}
           </button>
         </form>
+        </Modal>
       )}
 
       {loading && <p>Cargando…</p>}
@@ -260,125 +290,139 @@ export function PersonasListPage() {
               <tr>
                 <th>Nombre</th>
                 <th>RUT</th>
+                <th>Tipo</th>
                 <th>Email</th>
                 <th>Teléfono</th>
                 <th>Dirección</th>
-                <th>Acceso</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {personas.map((persona) => {
-                const usuario = usuarios.find((u) => u.personaId === persona.id);
-                return (
-                  <Fragment key={persona.id}>
-                    <tr>
-                      <td>{persona.nombreCompleto}</td>
-                      <td>{persona.rut}</td>
-                      <td>{persona.email ?? ''}</td>
-                      <td>{persona.telefono ?? ''}</td>
-                      <td>{persona.direccion ?? ''}</td>
-                      <td>
-                        {usuario ? (
-                          <span
-                            className={`badge badge--${usuario.activo ? 'activo' : 'inactivo'}`}
-                          >
-                            {usuario.rol}
-                          </span>
-                        ) : (
-                          <span className="empty-state">Sin acceso</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="table__actions">
-                          <button type="button" onClick={() => abrirEdicion(persona)}>
-                            Editar
-                          </button>
-                          <button type="button" onClick={() => toggleAcceso(persona.id)}>
-                            {expandedId === persona.id ? 'Ocultar' : 'Acceso'}
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => handleDelete(persona.id)}
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {expandedId === persona.id && (
-                      <tr>
-                        <td colSpan={7}>
-                          <div className="proveedores-panel">
-                            {accesoError && <p className="auth-card__error">{accesoError}</p>}
-                            <div className="proveedores-panel__add">
-                              <select
-                                value={accesoForm.rol}
-                                onChange={(e) =>
-                                  setAccesoForm({
-                                    ...accesoForm,
-                                    rol: e.target.value as RolUsuario,
-                                  })
-                                }
-                              >
-                                {ROLES.map((rol) => (
-                                  <option key={rol} value={rol}>
-                                    {rol}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                type="password"
-                                placeholder={
-                                  usuario ? 'Nueva contraseña (opcional)' : 'Contraseña'
-                                }
-                                value={accesoForm.password}
-                                onChange={(e) =>
-                                  setAccesoForm({ ...accesoForm, password: e.target.value })
-                                }
-                              />
-                              {usuario && (
-                                <label className="checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={accesoForm.activo}
-                                    onChange={(e) =>
-                                      setAccesoForm({ ...accesoForm, activo: e.target.checked })
-                                    }
-                                  />
-                                  Activo
-                                </label>
-                              )}
-                              <button
-                                type="button"
-                                disabled={savingAcceso}
-                                onClick={() => handleGuardarAcceso(persona.id)}
-                              >
-                                {usuario ? 'Guardar cambios' : 'Crear acceso'}
-                              </button>
-                              {usuario && (
-                                <button
-                                  type="button"
-                                  className="danger danger--small"
-                                  onClick={() => handleQuitarAcceso(usuario.id)}
-                                >
-                                  Quitar acceso
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+              {personas.map((persona) => (
+                <tr key={persona.id}>
+                  <td>{persona.nombreCompleto}</td>
+                  <td>{persona.rut}</td>
+                  <td>
+                    {persona.tipoPersona && (
+                      <span className={`badge badge--${persona.tipoPersona.toLowerCase()}`}>
+                        {TIPO_PERSONA_LABELS[persona.tipoPersona]}
+                      </span>
                     )}
-                  </Fragment>
-                );
-              })}
+                  </td>
+                  <td>{persona.email ?? ''}</td>
+                  <td>{persona.telefono ?? ''}</td>
+                  <td>{persona.direccion ?? ''}</td>
+                  <td>
+                    <div className="table__actions">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="Acceso al sistema"
+                        aria-label="Acceso al sistema"
+                        onClick={() => abrirAcceso(persona.id)}
+                      >
+                        <IconLlave />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="Editar"
+                        aria-label="Editar"
+                        onClick={() => abrirEdicion(persona)}
+                      >
+                        <IconEditar />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button icon-button--danger"
+                        title="Eliminar"
+                        aria-label="Eliminar"
+                        onClick={() => handleDelete(persona.id)}
+                      >
+                        <IconEliminar />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {accesoPersonaId && (() => {
+        const persona = personas.find((p) => p.id === accesoPersonaId);
+        const usuario = usuarios.find((u) => u.personaId === accesoPersonaId);
+        return (
+          <Modal titulo={`Acceso al sistema — ${persona?.nombreCompleto ?? ''}`} onClose={cerrarAcceso}>
+            <div className="inline-form">
+              {usuario ? (
+                <p className="empty-state">
+                  Ya tiene acceso como <strong>{usuario.rol}</strong>. Puedes cambiar el rol,
+                  activar/desactivar la cuenta o resetear la contraseña.
+                </p>
+              ) : (
+                <p className="empty-state">Esta persona todavía no tiene acceso al sistema.</p>
+              )}
+
+              <div className="inline-form__grid">
+                <label>
+                  Rol
+                  <select
+                    value={accesoForm.rol}
+                    onChange={(e) =>
+                      setAccesoForm({ ...accesoForm, rol: e.target.value as RolUsuario })
+                    }
+                  >
+                    {ROLES.map((rol) => (
+                      <option key={rol} value={rol}>
+                        {rol}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {usuario ? 'Nueva contraseña (opcional)' : 'Contraseña'}
+                  <input
+                    type="password"
+                    value={accesoForm.password}
+                    onChange={(e) => setAccesoForm({ ...accesoForm, password: e.target.value })}
+                  />
+                </label>
+                {usuario && (
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={accesoForm.activo}
+                      onChange={(e) =>
+                        setAccesoForm({ ...accesoForm, activo: e.target.checked })
+                      }
+                    />
+                    Activo
+                  </label>
+                )}
+              </div>
+
+              {accesoError && <p className="auth-card__error">{accesoError}</p>}
+
+              <div className="table__actions">
+                <button type="button" disabled={savingAcceso} onClick={handleGuardarAcceso}>
+                  {savingAcceso ? 'Guardando…' : usuario ? 'Guardar cambios' : 'Crear acceso'}
+                </button>
+                {usuario && (
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => handleQuitarAcceso(usuario.id)}
+                  >
+                    Quitar acceso
+                  </button>
+                )}
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

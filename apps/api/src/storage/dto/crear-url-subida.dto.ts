@@ -1,4 +1,4 @@
-import { IsIn, IsString } from 'class-validator';
+import { IsIn, IsInt, IsString, Min } from 'class-validator';
 
 export const CARPETAS_SUBIDA = ['documentos', 'fotos'] as const;
 
@@ -11,4 +11,8 @@ export class CrearUrlSubidaDto {
 
   @IsString()
   contentType: string;
+
+  @IsInt()
+  @Min(1)
+  tamanioBytes: number;
 }
