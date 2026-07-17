@@ -13,7 +13,7 @@ import { FindFotosDto } from './dto/find-fotos.dto';
 
 @Injectable()
 export class FotoService {
-  private static readonly MAX_FOTOS_REQUERIMIENTO = 3;
+  private static readonly MAX_FOTOS_REQUERIMIENTO = 10;
 
   constructor(
     private readonly prisma: PrismaService,

@@ -15,7 +15,7 @@ import type {
 
 const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
 const TIPOS_REPARACION: TipoReparacion[] = ['LOCATIVA', 'ESTRUCTURAL'];
-const MAX_FOTOS_REQUERIMIENTO = 3;
+const MAX_FOTOS_REQUERIMIENTO = 10;
 
 const REQ_FORM_INICIAL = {
   urgencia: 'MEDIA' as UrgenciaRequerimiento,
