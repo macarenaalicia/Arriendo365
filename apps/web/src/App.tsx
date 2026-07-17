@@ -13,6 +13,7 @@ import { AutosListPage } from './pages/AutosListPage';
 import { AutoDetailPage } from './pages/AutoDetailPage';
 import { PersonasListPage } from './pages/PersonasListPage';
 import { RequerimientosPage } from './pages/RequerimientosPage';
+import { RequerimientoDetailPage } from './pages/RequerimientoDetailPage';
 import { PropiedadesPublicasListPage } from './pages/PropiedadesPublicasListPage';
 import { PropiedadPublicaDetailPage } from './pages/PropiedadPublicaDetailPage';
 import { PerfilPage } from './pages/PerfilPage';
@@ -40,6 +41,7 @@ function App() {
               <Route path="/arriendos/:id" element={<ArriendoDetailPage />} />
               <Route path="/pagos" element={<PagosPage />} />
               <Route path="/requerimientos" element={<RequerimientosPage />} />
+              <Route path="/requerimientos/:id" element={<RequerimientoDetailPage />} />
               <Route path="/perfil" element={<PerfilPage />} />
               <Route path="/configuracion" element={<ConfiguracionPage />} />
               <Route element={<StaffRoute />}>

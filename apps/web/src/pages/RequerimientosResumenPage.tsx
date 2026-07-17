@@ -545,6 +545,7 @@ export function RequerimientosResumenPage() {
                       </td>
                       <td>
                         <div className="table__actions">
+                          <Link to={`/requerimientos/${req.id}`}>Ver</Link>
                           {req.estado === 'RESUELTO' || req.estado === 'RECHAZADO' ? (
                             <button type="button" onClick={() => handleReabrir(req.id)}>
                               Reabrir
