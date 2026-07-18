@@ -288,6 +288,7 @@ export interface RequerimientoActualizacion {
 export interface Requerimiento {
   id: string;
   arriendoPropiedadId: string;
+  arriendoPropiedad: ArriendoPropiedad;
   urgencia: UrgenciaRequerimiento;
   estado: EstadoRequerimiento;
   tecnicoId: string | null;

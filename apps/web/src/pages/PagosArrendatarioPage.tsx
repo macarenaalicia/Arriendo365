@@ -43,6 +43,7 @@ const TIPO_SERVICIO_LABELS: Record<TipoProveedor, string> = {
 const CATEGORIA_PAGO_LABELS: Record<CategoriaPago, string> = {
   ARRIENDO: 'arriendo',
   SERVICIOS_BASICOS: 'servicios básicos',
+  GARANTIA: 'garantía',
 };
 
 interface BloquePagosCategoriaProps {

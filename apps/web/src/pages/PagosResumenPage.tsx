@@ -41,6 +41,7 @@ const APROBACION_LABELS: Record<Aprobacion, string> = {
 const CATEGORIA_PAGO_LABELS: Record<CategoriaPago, string> = {
   ARRIENDO: 'Arriendo',
   SERVICIOS_BASICOS: 'Servicios básicos',
+  GARANTIA: 'Garantía',
 };
 
 const TIPO_SERVICIO_LABELS: Record<TipoProveedor, string> = {
