@@ -232,4 +232,15 @@ export class RequerimientoService {
       include: DETALLE_INCLUDE,
     });
   }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    // Presupuestos y gastos no tienen onDelete: Cascade (a diferencia de las
+    // actualizaciones), así que hay que borrarlos primero o la FK lo impide.
+    await this.prisma.$transaction([
+      this.prisma.requerimientoPresupuesto.deleteMany({ where: { requerimientoId: id } }),
+      this.prisma.gasto.deleteMany({ where: { requerimientoId: id } }),
+      this.prisma.requerimiento.delete({ where: { id } }),
+    ]);
+  }
 }

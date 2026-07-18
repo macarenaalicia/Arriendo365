@@ -27,6 +27,7 @@ import {
 } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import { IconCheck, IconEditar, IconEliminar, IconReloj } from '../components/icons';
 import { MEDIOS_PAGO } from '../lib/periodos';
 import { eliminarDocumento, listarDocumentos, subirDocumento } from '../lib/documentos';
@@ -299,6 +300,7 @@ export function AutoDetailPage() {
     await eliminarDocumento(documentoId);
     setDocumentos((prev) => prev.filter((d) => d.id !== documentoId));
   };
+  const eliminarDocumentoAutoConfirmar = useConfirmarEliminar<string>(handleEliminarDocumentoAuto);
 
   const abrirModalDocumentoAuto = () => {
     setDocumentoForm(DOCUMENTO_FORM_INICIAL);
@@ -472,6 +474,7 @@ export function AutoDetailPage() {
     if (editingMantencionId === mantencionId) cancelarEdicionMantencion();
     setMantenciones((prev) => prev.filter((m) => m.id !== mantencionId));
   };
+  const eliminarMantencionConfirmar = useConfirmarEliminar<string>(handleDeleteMantencion);
 
   const handleAprobarMantencion = async (mantencionId: string) => {
     if (!id) return;
@@ -586,6 +589,7 @@ export function AutoDetailPage() {
     if (editingArriendoId === arriendoId) cancelarEdicionArriendo();
     setArriendosAuto((prev) => prev.filter((a) => a.id !== arriendoId));
   };
+  const eliminarArriendoConfirmar = useConfirmarEliminar<string>(handleDeleteArriendo);
 
   // --- Pagos de arriendo ---
 
@@ -729,6 +733,7 @@ export function AutoDetailPage() {
     await api.delete(`/pagos/${pagoId}`);
     setPagosAuto((prev) => prev.filter((p) => p.id !== pagoId));
   };
+  const eliminarPagoAutoConfirmar = useConfirmarEliminar<string>(handleDeletePago);
 
   const handleAprobarPago = async (pagoId: string) => {
     await api.patch(`/pagos/${pagoId}`, { aprobado: true, estado: 'PAGADO' });
@@ -815,6 +820,7 @@ export function AutoDetailPage() {
     await api.delete(`/autos/${id}/pagos-vehiculo/${pagoId}`);
     cargarPagosVehiculo();
   };
+  const eliminarTagConfirmar = useConfirmarEliminar<string>(handleDeleteTag);
 
   // --- Abono de boletas TAG ---
   // El abono es un pago general contra la deuda total del Tag: no se elige
@@ -984,6 +990,7 @@ export function AutoDetailPage() {
     await api.delete(`/autos/${id}/pagos-vehiculo/${pagoId}`);
     cargarPagosVehiculo();
   };
+  const eliminarMultaConfirmar = useConfirmarEliminar<string>(handleDeleteMulta);
 
   if (loading) return <p>Cargando…</p>;
   if (error) return <p className="error-text">{error}</p>;
@@ -1177,7 +1184,7 @@ export function AutoDetailPage() {
                           className="icon-button icon-button--danger"
                           title="Eliminar"
                           aria-label="Eliminar"
-                          onClick={() => handleEliminarDocumentoAuto(doc.id)}
+                          onClick={() => eliminarDocumentoAutoConfirmar.pedir(doc.id)}
                         >
                           <IconEliminar />
                         </button>
@@ -1402,7 +1409,7 @@ export function AutoDetailPage() {
                 <button
                   type="button"
                   className="danger"
-                  onClick={() => handleDeleteArriendo(editingArriendoId)}
+                  onClick={() => eliminarArriendoConfirmar.pedir(editingArriendoId)}
                 >
                   Eliminar
                 </button>
@@ -1441,7 +1448,7 @@ export function AutoDetailPage() {
                     className="icon-button icon-button--small icon-button--danger"
                     title="Eliminar"
                     aria-label="Eliminar"
-                    onClick={() => handleDeleteArriendo(a.id)}
+                    onClick={() => eliminarArriendoConfirmar.pedir(a.id)}
                   >
                     <IconEliminar />
                   </button>
@@ -1598,7 +1605,7 @@ export function AutoDetailPage() {
                                 className="icon-button icon-button--danger"
                                 title="Eliminar"
                                 aria-label="Eliminar"
-                                onClick={() => handleDeletePago(pago.id)}
+                                onClick={() => eliminarPagoAutoConfirmar.pedir(pago.id)}
                               >
                                 <IconEliminar />
                               </button>
@@ -1833,7 +1840,7 @@ export function AutoDetailPage() {
                           className="icon-button icon-button--danger"
                           title="Eliminar"
                           aria-label="Eliminar"
-                          onClick={() => handleDeleteMantencion(m.id)}
+                          onClick={() => eliminarMantencionConfirmar.pedir(m.id)}
                         >
                           <IconEliminar />
                         </button>
@@ -1934,7 +1941,7 @@ export function AutoDetailPage() {
                             className="icon-button icon-button--danger"
                             title="Eliminar"
                             aria-label="Eliminar"
-                            onClick={() => handleDeleteTag(pago.id)}
+                            onClick={() => eliminarTagConfirmar.pedir(pago.id)}
                           >
                             <IconEliminar />
                           </button>
@@ -2011,7 +2018,7 @@ export function AutoDetailPage() {
                             className="icon-button icon-button--danger"
                             title="Eliminar"
                             aria-label="Eliminar"
-                            onClick={() => handleDeleteMulta(pago.id)}
+                            onClick={() => eliminarMultaConfirmar.pedir(pago.id)}
                           >
                             <IconEliminar />
                           </button>
@@ -2289,6 +2296,12 @@ export function AutoDetailPage() {
           </div>
         </Modal>
       )}
+      {eliminarDocumentoAutoConfirmar.modal}
+      {eliminarArriendoConfirmar.modal}
+      {eliminarPagoAutoConfirmar.modal}
+      {eliminarMantencionConfirmar.modal}
+      {eliminarTagConfirmar.modal}
+      {eliminarMultaConfirmar.modal}
     </div>
   );
 }

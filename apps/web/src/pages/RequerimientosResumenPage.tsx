@@ -4,7 +4,8 @@ import { api, ApiError } from '../api/client';
 import { descargarCsv } from '../lib/exportarCsv';
 import { subirFoto } from '../lib/fotos';
 import { Modal } from '../components/Modal';
-import { IconEditar, IconRechazar } from '../components/icons';
+import { IconEditar, IconEliminar, IconRechazar } from '../components/icons';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import {
   HistorialRequerimientoBoton,
   HistorialRequerimientoFilas,
@@ -290,6 +291,12 @@ export function RequerimientosResumenPage() {
     await api.patch(`/requerimientos/${reqId}`, { estado: 'REABIERTO' });
     cargarRequerimientos();
   };
+
+  const handleDelete = async (reqId: string) => {
+    await api.delete(`/requerimientos/${reqId}`);
+    cargarRequerimientos();
+  };
+  const eliminarConfirmar = useConfirmarEliminar<string>(handleDelete);
 
   if (loading) return <p>Cargando…</p>;
   if (loadError) return <p className="error-text">{loadError}</p>;
@@ -656,6 +663,15 @@ export function RequerimientosResumenPage() {
                               </button>
                             </>
                           )}
+                          <button
+                            type="button"
+                            className="icon-button icon-button--danger"
+                            title="Eliminar"
+                            aria-label="Eliminar"
+                            onClick={() => eliminarConfirmar.pedir(req.id)}
+                          >
+                            <IconEliminar />
+                          </button>
                           <HistorialRequerimientoBoton
                             actualizaciones={req.actualizaciones}
                             abierto={historialAbierto}
@@ -679,6 +695,7 @@ export function RequerimientosResumenPage() {
           </table>
         </div>
       )}
+      {eliminarConfirmar.modal}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { RolUsuario } from '@prisma/client';
 import { RequerimientoService } from './requerimiento.service';
 import { CreateRequerimientoDto } from './dto/create-requerimiento.dto';
@@ -29,5 +29,11 @@ export class RequerimientoController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateRequerimientoDto) {
     return this.requerimientoService.update(id, dto);
+  }
+
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO)
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.requerimientoService.remove(id);
   }
 }

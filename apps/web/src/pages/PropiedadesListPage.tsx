@@ -7,6 +7,7 @@ import { formatEnumLabel, formatFecha } from '../lib/format';
 import { eliminarFoto, listarFotos, subirFoto } from '../lib/fotos';
 import { eliminarDocumento, listarDocumentos, subirDocumento } from '../lib/documentos';
 import { Modal } from '../components/Modal';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import { IconEditar, IconEliminar } from '../components/icons';
 
 const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
@@ -314,10 +315,10 @@ export function PropiedadesListPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta propiedad?')) return;
     await api.delete(`/propiedades/${id}`);
     cargar();
   };
+  const eliminarPropiedad = useConfirmarEliminar<string>(handleDelete);
 
   const subirArchivoFoto = async (archivo: File) => {
     if (!editingId) return;
@@ -353,6 +354,7 @@ export function PropiedadesListPage() {
     await eliminarFoto(fotoId);
     setFotos((prev) => prev.filter((f) => f.id !== fotoId));
   };
+  const eliminarFotoConfirmar = useConfirmarEliminar<string>(handleEliminarFoto);
 
   const subirArchivoDocumento = async (archivo: File) => {
     if (!editingId) return;
@@ -401,6 +403,7 @@ export function PropiedadesListPage() {
     await eliminarDocumento(documentoId);
     setDocumentos((prev) => prev.filter((d) => d.id !== documentoId));
   };
+  const eliminarDocumentoConfirmar = useConfirmarEliminar<string>(handleEliminarDocumento);
 
   const abrirModalDocumento = () => {
     setDocumentoForm(DOCUMENTO_FORM_INICIAL);
@@ -458,6 +461,7 @@ export function PropiedadesListPage() {
     if (editingProveedorId === proveedorId) cancelarEdicionProveedor();
     setProveedores((prev) => prev.filter((p) => p.id !== proveedorId));
   };
+  const eliminarProveedorConfirmar = useConfirmarEliminar<string>(handleDeleteProveedor);
 
   return (
     <div>
@@ -658,7 +662,7 @@ export function PropiedadesListPage() {
                     <button
                       type="button"
                       className="danger danger--small"
-                      onClick={() => handleEliminarFoto(foto.id)}
+                      onClick={() => eliminarFotoConfirmar.pedir(foto.id)}
                     >
                       Eliminar
                     </button>
@@ -736,7 +740,7 @@ export function PropiedadesListPage() {
                               className="icon-button icon-button--danger"
                               title="Eliminar"
                               aria-label="Eliminar"
-                              onClick={() => handleEliminarDocumento(doc.id)}
+                              onClick={() => eliminarDocumentoConfirmar.pedir(doc.id)}
                             >
                               <IconEliminar />
                             </button>
@@ -866,7 +870,7 @@ export function PropiedadesListPage() {
                         className="icon-button icon-button--small icon-button--danger"
                         title="Eliminar"
                         aria-label="Eliminar"
-                        onClick={() => handleDeleteProveedor(proveedor.id)}
+                        onClick={() => eliminarProveedorConfirmar.pedir(proveedor.id)}
                       >
                         <IconEliminar />
                       </button>
@@ -1145,7 +1149,7 @@ export function PropiedadesListPage() {
                           className="icon-button icon-button--danger"
                           title="Eliminar"
                           aria-label="Eliminar"
-                          onClick={() => handleDelete(propiedad.id)}
+                          onClick={() => eliminarPropiedad.pedir(propiedad.id)}
                         >
                           <IconEliminar />
                         </button>
@@ -1157,6 +1161,10 @@ export function PropiedadesListPage() {
           </table>
         </div>
       )}
+      {eliminarPropiedad.modal}
+      {eliminarFotoConfirmar.modal}
+      {eliminarDocumentoConfirmar.modal}
+      {eliminarProveedorConfirmar.modal}
     </div>
   );
 }

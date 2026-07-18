@@ -5,6 +5,7 @@ import {
   HistorialRequerimientoFilas,
 } from '../components/HistorialRequerimiento';
 import { eliminarFoto, listarFotos, subirFoto } from '../lib/fotos';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import type {
   ArriendoPropiedad,
   Foto,
@@ -100,6 +101,7 @@ function BloqueArriendoRequerimientos({
     await eliminarFoto(fotoId);
     setFotos((prev) => prev.filter((f) => f.id !== fotoId));
   };
+  const eliminarFotoConfirmar = useConfirmarEliminar<string>(handleEliminarFoto);
 
   const [archivosPendientes, setArchivosPendientes] = useState<File[]>([]);
   const [arrastrandoFoto, setArrastrandoFoto] = useState(false);
@@ -377,7 +379,7 @@ function BloqueArriendoRequerimientos({
                                       <button
                                         type="button"
                                         className="danger danger--small"
-                                        onClick={() => handleEliminarFoto(foto.id)}
+                                        onClick={() => eliminarFotoConfirmar.pedir(foto.id)}
                                       >
                                         Eliminar
                                       </button>
@@ -435,6 +437,7 @@ function BloqueArriendoRequerimientos({
           )}
         </>
       )}
+      {eliminarFotoConfirmar.modal}
     </section>
   );
 }

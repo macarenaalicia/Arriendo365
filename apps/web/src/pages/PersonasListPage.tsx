@@ -4,6 +4,7 @@ import type { Persona, RolUsuario, Usuario } from '../api/types';
 import { ddmmyyyyToIso, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import { IconEditar, IconEliminar, IconLlave } from '../components/icons';
 
 const FORM_INICIAL = {
@@ -129,10 +130,10 @@ export function PersonasListPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta persona?')) return;
     await api.delete(`/personas/${id}`);
     cargar();
   };
+  const eliminarPersona = useConfirmarEliminar<string>(handleDelete);
 
   const abrirAcceso = (personaId: string) => {
     setAccesoPersonaId(personaId);
@@ -186,11 +187,11 @@ export function PersonasListPage() {
   };
 
   const handleQuitarAcceso = async (usuarioId: string) => {
-    if (!confirm('¿Quitar el acceso al sistema de esta persona?')) return;
     await api.delete(`/usuarios/${usuarioId}`);
     cerrarAcceso();
     cargarUsuarios();
   };
+  const eliminarAcceso = useConfirmarEliminar<string>(handleQuitarAcceso);
 
   return (
     <div>
@@ -337,7 +338,7 @@ export function PersonasListPage() {
                         className="icon-button icon-button--danger"
                         title="Eliminar"
                         aria-label="Eliminar"
-                        onClick={() => handleDelete(persona.id)}
+                        onClick={() => eliminarPersona.pedir(persona.id)}
                       >
                         <IconEliminar />
                       </button>
@@ -413,7 +414,7 @@ export function PersonasListPage() {
                   <button
                     type="button"
                     className="danger"
-                    onClick={() => handleQuitarAcceso(usuario.id)}
+                    onClick={() => eliminarAcceso.pedir(usuario.id)}
                   >
                     Quitar acceso
                   </button>
@@ -423,6 +424,8 @@ export function PersonasListPage() {
           </Modal>
         );
       })()}
+      {eliminarPersona.modal}
+      {eliminarAcceso.modal}
     </div>
   );
 }

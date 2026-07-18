@@ -4,6 +4,7 @@ import { api, ApiError } from '../api/client';
 import type { Auto, EstadoAuto } from '../api/types';
 import { formatEnumLabel } from '../lib/format';
 import { Modal } from '../components/Modal';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import { IconEliminar } from '../components/icons';
 
 const ESTADOS: EstadoAuto[] = ['DISPONIBLE', 'ARRENDADO', 'EN_MANTENCION'];
@@ -129,10 +130,10 @@ export function AutosListPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este auto?')) return;
     await api.delete(`/autos/${id}`);
     cargar();
   };
+  const eliminarAuto = useConfirmarEliminar<string>(handleDelete);
 
   const cambiarEstadoAuto = async (id: string, estado: string) => {
     await api.patch(`/autos/${id}`, { estado });
@@ -282,7 +283,7 @@ export function AutosListPage() {
                         className="icon-button icon-button--danger"
                         title="Eliminar"
                         aria-label="Eliminar"
-                        onClick={() => handleDelete(auto.id)}
+                        onClick={() => eliminarAuto.pedir(auto.id)}
                       >
                         <IconEliminar />
                       </button>
@@ -294,6 +295,7 @@ export function AutosListPage() {
           </table>
         </div>
       )}
+      {eliminarAuto.modal}
     </div>
   );
 }

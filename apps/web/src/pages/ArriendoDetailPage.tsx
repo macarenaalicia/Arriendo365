@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type {
@@ -18,6 +18,7 @@ import type {
 import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
+import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import { IconCheck, IconEditar, IconEliminar, IconReloj, IconRechazar } from '../components/icons';
 import { eliminarDocumento, listarDocumentos, subirDocumento } from '../lib/documentos';
 import {
@@ -105,6 +106,7 @@ const REQ_FORM_INICIAL = {
 
 export function ArriendoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { hash } = useLocation();
   const { rol } = useAuth();
   const esStaff = rol !== 'ARRENDATARIO';
@@ -201,6 +203,7 @@ export function ArriendoDetailPage() {
     await eliminarDocumento(documentoId);
     setDocumentos((prev) => prev.filter((d) => d.id !== documentoId));
   };
+  const eliminarDocumentoConfirmar = useConfirmarEliminar<string>(handleEliminarDocumento);
 
   const abrirModalDocumento = () => {
     setDocumentoForm(DOCUMENTO_FORM_INICIAL);
@@ -302,6 +305,13 @@ export function ArriendoDetailPage() {
       setSavingCondiciones(false);
     }
   };
+
+  const handleDeleteArriendo = async () => {
+    if (!id) return;
+    await api.delete(`/arriendos-propiedad/${id}`);
+    navigate('/');
+  };
+  const eliminarArriendoConfirmar = useConfirmarEliminar<true>(handleDeleteArriendo);
 
   useEffect(() => {
     if (esStaff) {
@@ -419,11 +429,11 @@ export function ArriendoDetailPage() {
   };
 
   const handleDeletePago = async (pagoId: string) => {
-    if (!confirm('¿Eliminar este pago?')) return;
     await api.delete(`/pagos/${pagoId}`);
     if (editingPagoId === pagoId) cerrarPagoForm();
     setPagos((prev) => prev.filter((p) => p.id !== pagoId));
   };
+  const eliminarPagoConfirmar = useConfirmarEliminar<string>(handleDeletePago);
 
   const handleAprobarPago = async (pagoId: string) => {
     await api.patch(`/pagos/${pagoId}`, { aprobado: true, estado: 'PAGADO' });
@@ -627,7 +637,7 @@ export function ArriendoDetailPage() {
                         className="icon-button icon-button--danger"
                         title="Eliminar"
                         aria-label="Eliminar"
-                        onClick={() => handleDeletePago(pago.id)}
+                        onClick={() => eliminarPagoConfirmar.pedir(pago.id)}
                       >
                         <IconEliminar />
                       </button>
@@ -767,12 +777,22 @@ export function ArriendoDetailPage() {
 
             {condicionesError && <p className="auth-card__error">{condicionesError}</p>}
 
-            <button type="submit" disabled={savingCondiciones}>
-              {savingCondiciones ? 'Guardando…' : 'Guardar cambios'}
-            </button>
+            <div className="table__actions">
+              <button type="submit" disabled={savingCondiciones}>
+                {savingCondiciones ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => eliminarArriendoConfirmar.pedir(true)}
+              >
+                Eliminar arriendo
+              </button>
+            </div>
           </form>
         </Modal>
       )}
+      {eliminarArriendoConfirmar.modal}
 
       {esStaff && (
         <section>
@@ -812,7 +832,7 @@ export function ArriendoDetailPage() {
                           className="icon-button icon-button--danger"
                           title="Eliminar"
                           aria-label="Eliminar"
-                          onClick={() => handleEliminarDocumento(doc.id)}
+                          onClick={() => eliminarDocumentoConfirmar.pedir(doc.id)}
                         >
                           <IconEliminar />
                         </button>
@@ -1277,6 +1297,8 @@ export function ArriendoDetailPage() {
           </div>
         )}
       </section>
+      {eliminarPagoConfirmar.modal}
+      {eliminarDocumentoConfirmar.modal}
     </div>
   );
 }
