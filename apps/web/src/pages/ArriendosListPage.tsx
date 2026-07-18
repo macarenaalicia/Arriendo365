@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { PERIODOS_PAGO_AUTO_LABELS } from '../api/types';
+import { PERIODOS_PAGO_AUTO_LABELS, SUFIJO_PERIODO_PAGO_AUTO } from '../api/types';
 import type {
   ArriendoAuto,
   ArriendoPropiedad,
@@ -545,6 +545,7 @@ export function ArriendosListPage() {
                   <th>Estado</th>
                   <th>Monto</th>
                   <th>Kilometraje de entrega</th>
+                  <th>Kilometraje actual</th>
                   {esStaff && <th>Reajuste</th>}
                   <th>{esStaff ? 'Detalle' : 'Pagos y mantenciones'}</th>
                 </tr>
@@ -568,8 +569,12 @@ export function ArriendosListPage() {
                           {arriendoAuto.estado}
                         </span>
                       </td>
-                      <td>{formatMonto(arriendoAuto.montoArriendo)}/mes</td>
+                      <td>
+                        {formatMonto(arriendoAuto.montoArriendo)}
+                        {SUFIJO_PERIODO_PAGO_AUTO[arriendoAuto.periodoPago]}
+                      </td>
                       <td>{arriendoAuto.kilometrajeEntrega.toLocaleString('es-CL')} km</td>
+                      <td>{arriendoAuto.auto.kilometraje.toLocaleString('es-CL')} km</td>
                       {esStaff && (
                         <td>
                           {alzaAutoVisible ? (

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
-import { AUTOPISTAS_TAG, PERIODOS_PAGO_AUTO_LABELS } from '../api/types';
+import {
+  AUTOPISTAS_TAG,
+  PERIODOS_PAGO_AUTO_LABELS,
+  SUFIJO_PERIODO_PAGO_AUTO,
+} from '../api/types';
 import type {
   ArriendoAuto,
   Auto,
@@ -612,8 +616,15 @@ export function AutoDetailPage() {
     return acc + dias;
   }, 0);
 
-  const ultimoKilometrajeRegistrado =
-    pagosAutoOrdenados.find((p) => p.kilometraje != null)?.kilometraje ?? null;
+  // Considera tanto los pagos de arriendo como las mantenciones: cualquiera
+  // de los dos puede traer el kilometraje más reciente del auto.
+  const lecturasKilometraje = [
+    ...pagosAuto
+      .filter((p) => p.kilometraje != null)
+      .map((p) => ({ fecha: p.periodo, kilometraje: p.kilometraje as number })),
+    ...mantenciones.map((m) => ({ fecha: m.fechaMantencion, kilometraje: m.kilometrajeActual })),
+  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const ultimoKilometrajeRegistrado = lecturasKilometraje[0]?.kilometraje ?? null;
 
   const abrirCreacionPago = () => {
     setEditingPagoId(null);
@@ -1113,7 +1124,10 @@ export function AutoDetailPage() {
           <h2>Condiciones</h2>
           {arriendoActivo ? (
             <>
-              <p>Monto: {formatMonto(arriendoActivo.montoArriendo)}/mes</p>
+              <p>
+                Monto: {formatMonto(arriendoActivo.montoArriendo)}
+                {SUFIJO_PERIODO_PAGO_AUTO[arriendoActivo.periodoPago]}
+              </p>
               <p>Periodo de pago: {PERIODOS_PAGO_AUTO_LABELS[arriendoActivo.periodoPago]}</p>
               <p>Entrega: {formatFecha(arriendoActivo.fechaEntrega)}</p>
               <p>Reajuste: {arriendoActivo.periodoAlza}</p>
@@ -1428,7 +1442,10 @@ export function AutoDetailPage() {
             {otrosArriendos.map((a) => (
               <div key={a.id} className="proveedores-panel__row">
                 <span className="proveedores-panel__tipo">{a.arrendatario.nombreCompleto}</span>
-                <span>Monto: {formatMonto(a.montoArriendo)}/mes</span>
+                <span>
+                  Monto: {formatMonto(a.montoArriendo)}
+                  {SUFIJO_PERIODO_PAGO_AUTO[a.periodoPago]}
+                </span>
                 <span>Entrega: {formatFecha(a.fechaEntrega)}</span>
                 <span>
                   Estado: <span className={`badge badge--${a.estado.toLowerCase()}`}>{a.estado}</span>

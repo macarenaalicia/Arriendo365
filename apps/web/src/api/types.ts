@@ -193,6 +193,12 @@ export const PERIODOS_PAGO_AUTO_LABELS: Record<PeriodoPagoAuto, string> = {
   MENSUAL: 'Mensual',
 };
 
+export const SUFIJO_PERIODO_PAGO_AUTO: Record<PeriodoPagoAuto, string> = {
+  SEMANAL: '/semana',
+  DOS_SEMANAS: '/2 semanas',
+  MENSUAL: '/mes',
+};
+
 export interface ArriendoAuto {
   id: string;
   autoId: string;
