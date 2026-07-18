@@ -336,6 +336,78 @@ a {
   background: white;
 }
 
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-dropdown__trigger:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.nav-dropdown__trigger.active {
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  background: white;
+}
+
+.nav-dropdown__arrow {
+  font-size: 0.7rem;
+}
+
+.nav-dropdown__panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.4rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+  z-index: 20;
+}
+
+.nav-dropdown__panel a {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.nav-dropdown__panel a:hover {
+  background: var(--color-bg);
+}
+
+.nav-dropdown__panel a.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-weight: 700;
+}
+
 .user-menu {
   position: relative;
 }
@@ -855,6 +927,30 @@ section + section {
   color: #1e40af;
 }
 
+/* Tipo de pago de arriendo de auto: Arriendo/Abono/Garantía (ver
+   tipoPagoDePago en AutoDetailPage) — distinto de la clasificación
+   completo/parcial/final de propiedades. */
+.badge--tipo-arriendo {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge--tipo-abono {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge--tipo-garantia {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.field-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-top: -0.5rem;
+}
+
 /* Clasificación de un pago dentro de su ciclo (ver clasificarTipoPago en
    lib/periodos.ts): completo/final cierran el saldo, abono/parcial no. */
 .badge--completo {
@@ -1020,6 +1116,17 @@ section + section {
   box-shadow: -6px 0 6px -4px rgba(23, 26, 35, 0.08);
 }
 
+/* En tablas con muchas columnas, la columna final (siempre Acciones) puede
+   quedar tan angosta que los dos botones de ícono (Editar/Eliminar) se
+   apilan en vez de quedar uno al lado del otro. Al no dejar que el grupo
+   de acciones se envuelva, el layout de la tabla se ve forzado a reservar
+   el ancho que realmente necesita. No se toca el caso de Revisión (con
+   botones de texto "Aprobar"/"Rechazar"), que no es la última columna.
+*/
+.table td:last-child .table__actions {
+  flex-wrap: nowrap;
+}
+
 .table th:last-child {
   background: var(--color-surface-muted);
 }
@@ -1030,6 +1137,43 @@ section + section {
 
 .table__historial-row td:last-child {
   background: var(--color-surface-muted);
+}
+
+/* Fila de un abono en el ledger de Tag: se distingue del resto de boletas
+   (cargos) con un tinte violeta suave, incluyendo la columna de Acciones
+   (que va con "sticky" y background propio, así que hay que pisarlo). */
+.table-row--abono {
+  background: #f5f3ff;
+}
+
+.table-row--abono:hover {
+  background: #ede9fe;
+}
+
+.table-row--abono td:last-child {
+  background: #f5f3ff;
+}
+
+.table-row--abono:hover td:last-child {
+  background: #ede9fe;
+}
+
+/* Fila de un pago de garantía en Pagos de arriendo: se distingue del resto
+   (arriendo/abono) con un tinte violeta, incluyendo la columna de Acciones. */
+.table-row--garantia {
+  background: #f3e8ff;
+}
+
+.table-row--garantia:hover {
+  background: #e9d5ff;
+}
+
+.table-row--garantia td:last-child {
+  background: #f3e8ff;
+}
+
+.table-row--garantia:hover td:last-child {
+  background: #e9d5ff;
 }
 
 /* La fila de detalle ocupa una sola celda (colSpan) con una tabla anidada
@@ -1242,6 +1386,13 @@ section + section {
   color: var(--color-primary);
   cursor: pointer;
   text-decoration: underline;
+}
+
+.link-button--mostrar-mas {
+  display: block;
+  margin-left: 1.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
 }
 
 .historial-toggle {

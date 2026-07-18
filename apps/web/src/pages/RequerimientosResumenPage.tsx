@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { descargarCsv } from '../lib/exportarCsv';
+import { subirFoto } from '../lib/fotos';
 import { Modal } from '../components/Modal';
 import { IconEditar, IconRechazar } from '../components/icons';
 import {
@@ -45,6 +46,8 @@ const CREATE_FORM_INICIAL = {
   notasArrendatario: '',
 };
 
+const MAX_FOTOS_REQUERIMIENTO = 10;
+
 export function RequerimientosResumenPage() {
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
   const [arriendos, setArriendos] = useState<ArriendoPropiedad[]>([]);
@@ -66,6 +69,30 @@ export function RequerimientosResumenPage() {
   const [createForm, setCreateForm] = useState(CREATE_FORM_INICIAL);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [archivosPendientes, setArchivosPendientes] = useState<File[]>([]);
+  const [arrastrandoFoto, setArrastrandoFoto] = useState(false);
+
+  const agregarArchivos = (lista: FileList | null) => {
+    const nuevos = Array.from(lista ?? []).filter((archivo) => archivo.type.startsWith('image/'));
+    if (nuevos.length === 0) return;
+    setArchivosPendientes((prev) => [...prev, ...nuevos].slice(0, MAX_FOTOS_REQUERIMIENTO));
+  };
+
+  const agregarArchivosPendientes = (event: React.ChangeEvent<HTMLInputElement>) => {
+    agregarArchivos(event.target.files);
+    event.target.value = '';
+  };
+
+  const handleDropFotos = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setArrastrandoFoto(false);
+    agregarArchivos(event.dataTransfer.files);
+  };
+
+  const quitarArchivoPendiente = (index: number) => {
+    setArchivosPendientes((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const cargarRequerimientos = () => {
     const params = new URLSearchParams();
@@ -176,12 +203,14 @@ export function RequerimientosResumenPage() {
     setShowCreateForm(false);
     setCreateForm(CREATE_FORM_INICIAL);
     setCreateError(null);
+    setArchivosPendientes([]);
   };
 
   const abrirCreacion = () => {
     cerrarForm();
     setCreateForm(CREATE_FORM_INICIAL);
     setCreateError(null);
+    setArchivosPendientes([]);
     setShowCreateForm(true);
   };
 
@@ -194,16 +223,25 @@ export function RequerimientosResumenPage() {
     setCreateError(null);
     setCreating(true);
     try {
-      await api.post('/requerimientos', {
+      const creado = await api.post<Requerimiento>('/requerimientos', {
         arriendoPropiedadId: createForm.arriendoPropiedadId,
         urgencia: createForm.urgencia,
         tipoReparacion: createForm.tipoReparacion,
         notasArrendatario: createForm.notasArrendatario || undefined,
       });
+
+      for (const archivo of archivosPendientes) {
+        await subirFoto(archivo, 'requerimiento', creado.id);
+      }
+
       cerrarCreacion();
       cargarRequerimientos();
     } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : 'No se pudo crear el requerimiento');
+      setCreateError(
+        err instanceof ApiError
+          ? err.message
+          : 'El requerimiento pudo haberse creado, pero alguna foto no se subió.',
+      );
     } finally {
       setCreating(false);
     }
@@ -347,6 +385,52 @@ export function RequerimientosResumenPage() {
               </select>
             </label>
           </div>
+
+          {archivosPendientes.length < MAX_FOTOS_REQUERIMIENTO ? (
+            <div
+              className={`inline-form__fotos${arrastrandoFoto ? ' inline-form__fotos--arrastrando' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setArrastrandoFoto(true);
+              }}
+              onDragLeave={() => setArrastrandoFoto(false)}
+              onDrop={handleDropFotos}
+            >
+              <span>
+                Fotos (opcional, máx. {MAX_FOTOS_REQUERIMIENTO}) — elige un archivo o arrástralo
+                aquí
+              </span>
+              <label className="button-like">
+                + Elegir fotos
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={agregarArchivosPendientes}
+                />
+              </label>
+            </div>
+          ) : (
+            <p className="empty-state">Máximo {MAX_FOTOS_REQUERIMIENTO} fotos alcanzado.</p>
+          )}
+
+          {archivosPendientes.length > 0 && (
+            <div className="fotos-grid">
+              {archivosPendientes.map((archivo, index) => (
+                <div key={`${archivo.name}-${index}`} className="fotos-grid__item">
+                  <span>{archivo.name}</span>
+                  <button
+                    type="button"
+                    className="danger danger--small"
+                    onClick={() => quitarArchivoPendiente(index)}
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <label>
             Descripción

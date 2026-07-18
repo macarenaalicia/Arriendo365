@@ -54,6 +54,15 @@ export class PagoVehiculoService {
 
   async remove(autoId: string, id: string) {
     await this.findOne(autoId, id);
-    await this.prisma.pagoVehiculo.delete({ where: { id } });
+
+    await this.prisma.$transaction([
+      // Si se elimina un abono, las boletas que cubría vuelven a quedar
+      // pendientes en vez de arrastrar un "pagado" sin abono real detrás.
+      this.prisma.pagoVehiculo.updateMany({
+        where: { abonoId: id },
+        data: { pagado: false, montoPagado: 0, abonoId: null },
+      }),
+      this.prisma.pagoVehiculo.delete({ where: { id } }),
+    ]);
   }
 }

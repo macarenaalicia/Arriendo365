@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { IconLogoRayo } from './icons';
 
 export function Layout() {
   const { logout, rol, nombreCompleto } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const esArrendatario = rol === 'ARRENDATARIO';
   const [menuAbierto, setMenuAbierto] = useState(false);
+  const [bienesAbierto, setBienesAbierto] = useState(false);
+  const bienesActivo =
+    location.pathname.startsWith('/propiedades') || location.pathname.startsWith('/autos');
 
   const handleLogout = () => {
     setMenuAbierto(false);
@@ -28,10 +32,34 @@ export function Layout() {
           <NavLink to="/" end>
             Arriendos
           </NavLink>
-          {!esArrendatario && <NavLink to="/propiedades">Propiedades</NavLink>}
-          {!esArrendatario && <NavLink to="/autos">Autos</NavLink>}
-          {!esArrendatario && <NavLink to="/personas">Personas</NavLink>}
           <NavLink to="/pagos">Pagos</NavLink>
+          {!esArrendatario && <NavLink to="/personas">Personas</NavLink>}
+          {!esArrendatario && (
+            <div
+              className={`nav-dropdown${bienesAbierto ? ' nav-dropdown--open' : ''}`}
+              onMouseEnter={() => setBienesAbierto(true)}
+              onMouseLeave={() => setBienesAbierto(false)}
+            >
+              <button
+                type="button"
+                className={`nav-dropdown__trigger${bienesActivo ? ' active' : ''}`}
+                onClick={() => setBienesAbierto((v) => !v)}
+              >
+                Administrar bienes
+                <span className="nav-dropdown__arrow">▾</span>
+              </button>
+              {bienesAbierto && (
+                <div className="nav-dropdown__panel">
+                  <NavLink to="/propiedades" onClick={() => setBienesAbierto(false)}>
+                    Propiedades
+                  </NavLink>
+                  <NavLink to="/autos" onClick={() => setBienesAbierto(false)}>
+                    Autos
+                  </NavLink>
+                </div>
+              )}
+            </div>
+          )}
           <NavLink to="/requerimientos">Requerimientos</NavLink>
         </nav>
 

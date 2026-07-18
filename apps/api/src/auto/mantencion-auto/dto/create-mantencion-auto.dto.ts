@@ -3,13 +3,14 @@ import {
   ArrayMinSize,
   IsArray,
   IsDate,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
-  IsString,
   IsUUID,
   Min,
 } from 'class-validator';
+import { EstadoPago, QuienPago } from '@prisma/client';
 
 export class CreateMantencionAutoDto {
   @IsArray()
@@ -36,6 +37,10 @@ export class CreateMantencionAutoDto {
   costo?: number;
 
   @IsOptional()
-  @IsString()
-  medioPago?: string;
+  @IsEnum(QuienPago)
+  quienPago?: QuienPago;
+
+  @IsOptional()
+  @IsEnum(EstadoPago)
+  estadoPago?: EstadoPago;
 }

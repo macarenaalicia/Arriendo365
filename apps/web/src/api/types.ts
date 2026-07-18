@@ -90,9 +90,51 @@ export interface Proveedor {
 export interface Auto {
   id: string;
   patente: string;
+  marca: string | null;
+  modelo: string | null;
+  anio: number | null;
   kilometraje: number;
   padronDocId: string | null;
   estado: EstadoAuto;
+}
+
+export type TipoPagoVehiculo =
+  | 'SEGURO'
+  | 'TAG'
+  | 'REVISION_TECNICA'
+  | 'PERMISO_CIRCULACION'
+  | 'SOAP'
+  | 'MULTA';
+
+export type Periodicidad = 'MENSUAL' | 'TRIMESTRAL' | 'SEMESTRAL' | 'ANUAL';
+
+export const AUTOPISTAS_TAG = [
+  'Autopase',
+  'Conopsa',
+  'Costanera Norte',
+  'Ruta Pass',
+  'Vespucio Sur',
+] as const;
+
+export interface PagoVehiculo {
+  id: string;
+  autoId: string;
+  tipo: TipoPagoVehiculo;
+  autopista: string | null;
+  numeroBoleta: string | null;
+  periodicidad: Periodicidad;
+  conCredito: boolean;
+  cuotas: number | null;
+  montoCuota: string | null;
+  monto: string;
+  fechaPago: string;
+  comprobanteFotoId: string | null;
+  pagado: boolean;
+  montoPagado: string;
+  esAbono: boolean;
+  abonoId: string | null;
+  estado: EstadoPago;
+  fechaPagoReal: string | null;
 }
 
 export interface Persona {
@@ -127,6 +169,8 @@ export interface MantencionAutoItem {
   configuracion: ConfiguracionMantencion;
 }
 
+export type QuienPago = 'PROPIETARIO' | 'ARRENDATARIO';
+
 export interface MantencionAuto {
   id: string;
   autoId: string;
@@ -134,12 +178,20 @@ export interface MantencionAuto {
   kilometrajeProxima: number | null;
   fechaMantencion: string;
   costo: string | null;
-  medioPago: string | null;
+  quienPago: QuienPago | null;
   estadoPago: EstadoPago;
   aprobado: boolean | null;
   motivoRechazo: string | null;
   items: MantencionAutoItem[];
 }
+
+export type PeriodoPagoAuto = 'SEMANAL' | 'DOS_SEMANAS' | 'MENSUAL';
+
+export const PERIODOS_PAGO_AUTO_LABELS: Record<PeriodoPagoAuto, string> = {
+  SEMANAL: '1 semana',
+  DOS_SEMANAS: '2 semanas',
+  MENSUAL: 'Mensual',
+};
 
 export interface ArriendoAuto {
   id: string;
@@ -148,6 +200,10 @@ export interface ArriendoAuto {
   kilometrajeEntrega: number;
   kilometrajeRecepcion: number | null;
   contratoDocId: string | null;
+  periodoPago: PeriodoPagoAuto;
+  fechaEntrega: string;
+  periodoAlza: string;
+  montoArriendo: string;
   estado: EstadoArriendo;
   arrendatario: Persona;
   auto: Auto;
@@ -171,7 +227,7 @@ export interface ArriendoPropiedad {
   arrendador?: Persona | null;
 }
 
-export type CategoriaPago = 'ARRIENDO' | 'SERVICIOS_BASICOS';
+export type CategoriaPago = 'ARRIENDO' | 'SERVICIOS_BASICOS' | 'GARANTIA';
 
 export interface Pago {
   id: string;
@@ -179,6 +235,8 @@ export interface Pago {
   arriendoId: string;
   periodo: string;
   fechaComprometida: string;
+  periodoHasta: string | null;
+  kilometraje: number | null;
   fechaPagoReal: string | null;
   monto: string;
   medioPago: string | null;

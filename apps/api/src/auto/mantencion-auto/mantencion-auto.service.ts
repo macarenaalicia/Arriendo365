@@ -43,6 +43,14 @@ export class MantencionAutoService {
     await this.assertAutoEnOrganizacion(autoId);
     await this.assertConfiguracionesExisten(dto.configuracionIds);
 
+    // Igual que en Pago: si quien la registra es staff, queda aprobada de
+    // inmediato (es un cobro que el propietario ya asumió, no un abono que
+    // haya que verificar). Pero el estado de pago NO se asume: aunque sea
+    // el propietario quien registre la mantención, igual debe transferirle
+    // el monto al arrendatario si fue este quien la pagó, así que el estado
+    // se elige explícitamente en el formulario.
+    const autoAprobado = !this.tenant.esArrendatario;
+
     return this.prisma.mantencionAuto.create({
       data: {
         autoId,
@@ -50,7 +58,9 @@ export class MantencionAutoService {
         kilometrajeProxima: dto.kilometrajeProxima,
         fechaMantencion: dto.fechaMantencion,
         costo: dto.costo,
-        medioPago: dto.medioPago,
+        quienPago: dto.quienPago,
+        aprobado: autoAprobado ? true : undefined,
+        estadoPago: dto.estadoPago,
         items: { create: dto.configuracionIds.map((configuracionId) => ({ configuracionId })) },
       },
       include: DETALLE_INCLUDE,
@@ -99,7 +109,7 @@ export class MantencionAutoService {
           kilometrajeProxima: dto.kilometrajeProxima,
           fechaMantencion: dto.fechaMantencion,
           costo: dto.costo,
-          medioPago: dto.medioPago,
+          quienPago: dto.quienPago,
           estadoPago: dto.estadoPago,
           aprobado: dto.aprobado,
           motivoRechazo: dto.motivoRechazo,

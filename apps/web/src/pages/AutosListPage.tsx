@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { Auto, EstadoAuto } from '../api/types';
@@ -8,7 +8,9 @@ import { IconEliminar } from '../components/icons';
 
 const ESTADOS: EstadoAuto[] = ['DISPONIBLE', 'ARRENDADO', 'EN_MANTENCION'];
 
-const FORM_INICIAL = { patente: '', kilometraje: '' };
+const FORM_INICIAL = { patente: '', marca: '', modelo: '', anio: '', kilometraje: '' };
+
+type CampoOrdenable = 'patente' | 'marca' | 'modelo' | 'anio' | 'kilometraje' | 'estado';
 
 export function AutosListPage() {
   const [autos, setAutos] = useState<Auto[]>([]);
@@ -17,6 +19,72 @@ export function AutosListPage() {
   const [form, setForm] = useState(FORM_INICIAL);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [sortField, setSortField] = useState<CampoOrdenable | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const [editingCell, setEditingCell] = useState<string | null>(null);
+  const [cellValue, setCellValue] = useState('');
+
+  const toggleSort = (campo: CampoOrdenable) => {
+    if (sortField === campo) {
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(campo);
+      setSortDir('asc');
+    }
+  };
+
+  const valorOrdenable = (auto: Auto, campo: CampoOrdenable): string | number => {
+    switch (campo) {
+      case 'patente':
+        return auto.patente;
+      case 'marca':
+        return auto.marca ?? '';
+      case 'modelo':
+        return auto.modelo ?? '';
+      case 'anio':
+        return auto.anio ?? 0;
+      case 'kilometraje':
+        return auto.kilometraje;
+      case 'estado':
+        return auto.estado;
+    }
+  };
+
+  const autosOrdenados = useMemo(() => {
+    if (!sortField) return autos;
+    const copia = [...autos];
+    copia.sort((a, b) => {
+      const va = valorOrdenable(a, sortField);
+      const vb = valorOrdenable(b, sortField);
+      const cmp =
+        typeof va === 'number' && typeof vb === 'number'
+          ? va - vb
+          : String(va).localeCompare(String(vb), 'es');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return copia;
+  }, [autos, sortField, sortDir]);
+
+  const startEditCell = (auto: Auto) => {
+    setEditingCell(auto.id);
+    setCellValue(String(auto.kilometraje));
+  };
+
+  const commitCellEdit = async (auto: Auto) => {
+    if (editingCell !== auto.id) return;
+    setEditingCell(null);
+
+    const raw = cellValue.trim();
+    if (raw === '' || raw === String(auto.kilometraje)) return;
+
+    const valor = Number(raw);
+    if (Number.isNaN(valor)) return;
+
+    await api.patch(`/autos/${auto.id}`, { kilometraje: valor });
+    cargar();
+  };
 
   const cargar = () => {
     setLoading(true);
@@ -46,6 +114,9 @@ export function AutosListPage() {
     try {
       await api.post('/autos', {
         patente: form.patente.toUpperCase(),
+        marca: form.marca || undefined,
+        modelo: form.modelo || undefined,
+        anio: form.anio ? Number(form.anio) : undefined,
         kilometraje: Number(form.kilometraje),
       });
       cerrarForm();
@@ -90,6 +161,30 @@ export function AutosListPage() {
               />
             </label>
             <label>
+              Marca
+              <input
+                value={form.marca}
+                onChange={(e) => setForm({ ...form, marca: e.target.value })}
+              />
+            </label>
+            <label>
+              Modelo
+              <input
+                value={form.modelo}
+                onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+              />
+            </label>
+            <label>
+              Año
+              <input
+                type="number"
+                min={1900}
+                max={2100}
+                value={form.anio}
+                onChange={(e) => setForm({ ...form, anio: e.target.value })}
+              />
+            </label>
+            <label>
               Kilometraje
               <input
                 type="number"
@@ -119,19 +214,54 @@ export function AutosListPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Patente</th>
-                <th>Kilometraje</th>
-                <th>Estado</th>
+                {(
+                  [
+                    ['patente', 'Patente'],
+                    ['marca', 'Marca'],
+                    ['modelo', 'Modelo'],
+                    ['anio', 'Año'],
+                    ['kilometraje', 'Kilometraje'],
+                    ['estado', 'Estado'],
+                  ] as Array<[CampoOrdenable, string]>
+                ).map(([campo, etiqueta]) => (
+                  <th key={campo} className="th-sortable" onClick={() => toggleSort(campo)}>
+                    {etiqueta}
+                    <span className="th-sortable__arrow">
+                      {sortField === campo ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </span>
+                  </th>
+                ))}
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {autos.map((auto) => (
+              {autosOrdenados.map((auto) => (
                 <tr key={auto.id}>
                   <td>
                     <Link to={`/autos/${auto.id}`}>{auto.patente}</Link>
                   </td>
-                  <td>{auto.kilometraje.toLocaleString('es-CL')} km</td>
+                  <td>{auto.marca ?? '—'}</td>
+                  <td>{auto.modelo ?? '—'}</td>
+                  <td>{auto.anio ?? '—'}</td>
+                  <td className="cell-editable" onClick={() => startEditCell(auto)}>
+                    {editingCell === auto.id ? (
+                      <input
+                        autoFocus
+                        type="number"
+                        min={0}
+                        className="cell-input"
+                        value={cellValue}
+                        onChange={(e) => setCellValue(e.target.value)}
+                        onBlur={() => commitCellEdit(auto)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          if (e.key === 'Escape') setEditingCell(null);
+                        }}
+                      />
+                    ) : (
+                      `${auto.kilometraje.toLocaleString('es-CL')} km`
+                    )}
+                  </td>
                   <td>
                     <select
                       className={`cell-select badge badge--${auto.estado.toLowerCase()}`}

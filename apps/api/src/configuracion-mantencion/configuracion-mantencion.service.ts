@@ -12,7 +12,7 @@ export class ConfiguracionMantencionService {
   }
 
   findAll() {
-    return this.prisma.configuracionMantencion.findMany();
+    return this.prisma.configuracionMantencion.findMany({ orderBy: { tipo: 'asc' } });
   }
 
   async findOne(id: string) {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { RolUsuario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
@@ -37,11 +37,23 @@ export class ArriendoPropiedadService {
     }
   }
 
+  private async assertSinArriendoActivo(propiedadId: string, excluirId?: string) {
+    const activo = await this.prisma.arriendoPropiedad.findFirst({
+      where: { propiedadId, estado: 'ACTIVO', id: excluirId ? { not: excluirId } : undefined },
+    });
+    if (activo) {
+      throw new ConflictException('Esta propiedad ya tiene un arriendo activo');
+    }
+  }
+
   async create(dto: CreateArriendoPropiedadDto) {
     await this.assertPropiedadEnOrganizacion(dto.propiedadId);
     await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
     if (dto.codeudorId) {
       await this.assertPersonaEnOrganizacion(dto.codeudorId);
+    }
+    if ((dto.estado ?? 'ACTIVO') === 'ACTIVO') {
+      await this.assertSinArriendoActivo(dto.propiedadId);
     }
 
     return this.prisma.arriendoPropiedad.create({
@@ -103,7 +115,7 @@ export class ArriendoPropiedadService {
   }
 
   async update(id: string, dto: UpdateArriendoPropiedadDto) {
-    await this.findOne(id);
+    const actual = await this.findOne(id);
 
     if (dto.propiedadId) {
       await this.assertPropiedadEnOrganizacion(dto.propiedadId);
@@ -113,6 +125,11 @@ export class ArriendoPropiedadService {
     }
     if (dto.codeudorId) {
       await this.assertPersonaEnOrganizacion(dto.codeudorId);
+    }
+
+    const estadoDestino = dto.estado ?? actual.estado;
+    if (estadoDestino === 'ACTIVO') {
+      await this.assertSinArriendoActivo(dto.propiedadId ?? actual.propiedadId, id);
     }
 
     return this.prisma.arriendoPropiedad.update({

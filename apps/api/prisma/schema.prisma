@@ -57,6 +57,8 @@ enum EstadoPago {
 enum CategoriaPago {
   ARRIENDO
   SERVICIOS_BASICOS
+  // Depósito de garantía de un arriendo de auto (no es un pago periódico).
+  GARANTIA
 }
 
 enum UrgenciaRequerimiento {
@@ -108,12 +110,21 @@ enum Periodicidad {
   ANUAL
 }
 
+// Cada cuánto se paga el arriendo de un auto (a diferencia de propiedades,
+// que siempre es mensual con un día fijo del mes).
+enum PeriodoPagoAuto {
+  SEMANAL
+  DOS_SEMANAS
+  MENSUAL
+}
+
 enum TipoPagoVehiculo {
   SEGURO
   TAG
   REVISION_TECNICA
   PERMISO_CIRCULACION
   SOAP
+  MULTA
 }
 
 enum TipoCobroAuto {
@@ -340,6 +351,13 @@ model Pago {
   arriendoId        String
   periodo           DateTime
   fechaComprometida DateTime
+  // Solo aplica a arriendos de auto: el período de pago no es un mes fijo
+  // como en propiedades, sino un rango (fechaComprometida = desde, esta =
+  // hasta). Queda null para pagos de propiedad.
+  periodoHasta      DateTime?
+  // Solo aplica a arriendos de auto: kilometraje del auto al momento del
+  // pago, cuando se informa (no siempre se registra).
+  kilometraje       Int?
   fechaPagoReal     DateTime?
   monto             Decimal        @db.Decimal(10, 2)
   medioPago         String?
@@ -436,6 +454,9 @@ model Auto {
   organizacionId String
   organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
   patente        String
+  marca          String?
+  modelo         String?
+  anio           Int?
   kilometraje    Int
   padronDocId    String?
   estado         EstadoAuto   @default(DISPONIBLE)
@@ -485,7 +506,8 @@ model MantencionAuto {
   // arriendo (pendiente/aprobado/rechazado) — quien la registra no queda
   // aprobada automáticamente, otro staff la revisa después.
   costo              Decimal?   @db.Decimal(10, 2)
-  medioPago          String?
+  // Quién debe hacerse cargo del costo (el medio de pago no es relevante).
+  quienPago          QuienPago?
   estadoPago         EstadoPago @default(PENDIENTE)
   aprobado           Boolean?
   motivoRechazo      String?
@@ -516,6 +538,12 @@ model ArriendoAuto {
   kilometrajeEntrega   Int
   kilometrajeRecepcion Int?
   contratoDocId        String?
+  // A diferencia de ArriendoPropiedad (que usa un día fijo del mes), un
+  // arriendo de auto se paga con esta frecuencia.
+  periodoPago          PeriodoPagoAuto @default(MENSUAL)
+  fechaEntrega         DateTime
+  periodoAlza          String
+  montoArriendo        Decimal        @db.Decimal(10, 2)
   estado               EstadoArriendo @default(ACTIVO)
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
@@ -528,6 +556,10 @@ model PagoVehiculo {
   autoId            String
   auto              Auto             @relation(fields: [autoId], references: [id])
   tipo              TipoPagoVehiculo
+  // Solo aplica cuando tipo = TAG: a qué autopista corresponde el cobro.
+  autopista         String?
+  // Solo aplica cuando tipo = TAG: número de boleta del cobro.
+  numeroBoleta      String?
   periodicidad      Periodicidad
   conCredito        Boolean          @default(false)
   cuotas            Int?
@@ -535,6 +567,26 @@ model PagoVehiculo {
   monto             Decimal          @db.Decimal(10, 2)
   fechaPago         DateTime
   comprobanteFotoId String?
+  // Se marca en true solo cuando montoPagado alcanza el monto total de la
+  // boleta (ver "Registrar abono" en el detalle del auto).
+  pagado            Boolean          @default(false)
+  // Cuánto se le ha abonado a esta boleta hasta ahora — un abono puede ser
+  // parcial y no cubrirla completa (queda con saldo = monto - montoPagado).
+  montoPagado        Decimal         @default(0) @db.Decimal(10, 2)
+  // true solo en la fila que representa el abono en sí (no una boleta),
+  // generada automáticamente al registrar un abono.
+  esAbono           Boolean          @default(false)
+  // En una boleta: a qué abono quedó asociada (si fue pagada). En la fila
+  // del abono: null. Permite revertir las boletas a pendiente si se
+  // elimina el abono que las cubría.
+  abonoId           String?
+  abono             PagoVehiculo?    @relation("AbonoBoletas", fields: [abonoId], references: [id])
+  boletasCubiertas  PagoVehiculo[]   @relation("AbonoBoletas")
+  // Usado por MULTA (y disponible para otros tipos a futuro): estado de
+  // pago y fecha en que efectivamente se pagó, distinta de fechaPago (que
+  // para una multa es la fecha de la infracción/registro).
+  estado            EstadoPago       @default(PENDIENTE)
+  fechaPagoReal     DateTime?
 
   @@map("pago_vehiculo")
 }

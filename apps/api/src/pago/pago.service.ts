@@ -91,53 +91,6 @@ export class PagoService {
     };
   }
 
-  /**
-   * Si ya pasó el día de pago del mes actual y no hay ningún pago de
-   * arriendo registrado (no rechazado) para ese periodo, genera uno con
-   * estado ATRASADO por el monto completo — para que el atraso quede
-   * visible en el resumen aunque nadie haya alcanzado a registrar nada.
-   */
-  private async generarPagoAtrasadoSiCorresponde(arriendoId: string): Promise<void> {
-    const arriendo = await this.prisma.arriendoPropiedad.findUnique({
-      where: { id: arriendoId },
-      select: { fechaPago: true, montoArriendo: true, estado: true },
-    });
-    if (!arriendo || arriendo.estado !== 'ACTIVO') return;
-
-    const hoy = new Date();
-    const ultimoDiaDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-    const dia = Math.min(arriendo.fechaPago, ultimoDiaDelMes);
-    const fechaVencimiento = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
-    if (hoy <= fechaVencimiento) return;
-
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const inicioMesSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
-
-    const existente = await this.prisma.pago.findFirst({
-      where: {
-        arriendoTipo: 'propiedad',
-        arriendoId,
-        categoria: 'ARRIENDO',
-        estado: { not: 'RECHAZADO' },
-        fechaComprometida: { gte: inicioMes, lt: inicioMesSiguiente },
-      },
-    });
-    if (existente) return;
-
-    await this.prisma.pago.create({
-      data: {
-        arriendoTipo: 'propiedad',
-        arriendoId,
-        periodo: fechaVencimiento,
-        fechaComprometida: fechaVencimiento,
-        monto: arriendo.montoArriendo,
-        estado: 'ATRASADO',
-        esAbono: false,
-        categoria: 'ARRIENDO',
-      },
-    });
-  }
-
   private validarTipoServicio(categoria: CreatePagoDto['categoria'], tipoServicio: CreatePagoDto['tipoServicio']) {
     const esServiciosBasicos = (categoria ?? 'ARRIENDO') === 'SERVICIOS_BASICOS';
     if (esServiciosBasicos && !tipoServicio) {
@@ -150,15 +103,24 @@ export class PagoService {
     await this.assertArriendoEnOrganizacion(dto.arriendoTipo, dto.arriendoId);
     const tipoServicio = this.validarTipoServicio(dto.categoria, dto.tipoServicio);
 
-    return this.prisma.pago.create({ data: { ...dto, tipoServicio } });
+    // Si quien registra el pago es staff (propietario/administrador/técnico),
+    // se da por aprobado de inmediato: no necesita que nadie más lo verifique.
+    // Solo el abono que reporta el arrendatario queda pendiente de revisión.
+    const autoAprobado = !this.tenant.esArrendatario;
+
+    return this.prisma.pago.create({
+      data: {
+        ...dto,
+        tipoServicio,
+        aprobado: dto.aprobado ?? (autoAprobado ? true : undefined),
+        estado: dto.estado ?? (autoAprobado ? 'PAGADO' : undefined),
+      },
+    });
   }
 
   async findAll(query: FindPagosDto) {
     if (query.arriendoTipo && query.arriendoId) {
       await this.assertArriendoEnOrganizacion(query.arriendoTipo, query.arriendoId);
-      if (query.arriendoTipo === 'propiedad') {
-        await this.generarPagoAtrasadoSiCorresponde(query.arriendoId);
-      }
 
       return this.prisma.pago.findMany({
         where: {
@@ -172,7 +134,6 @@ export class PagoService {
     }
 
     const { propiedadIds, autoIds } = await this.arriendoIdsDeLaOrganizacion();
-    await Promise.all(propiedadIds.map((id) => this.generarPagoAtrasadoSiCorresponde(id)));
 
     const where: Prisma.PagoWhereInput = {
       estado: query.estado,
@@ -214,7 +175,6 @@ export class PagoService {
 
   async resumen() {
     const { propiedadIds, autoIds } = await this.arriendoIdsDeLaOrganizacion();
-    await Promise.all(propiedadIds.map((id) => this.generarPagoAtrasadoSiCorresponde(id)));
 
     const pagos = await this.prisma.pago.findMany({
       where: {

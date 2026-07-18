@@ -1,10 +1,28 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDate, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { Periodicidad, TipoPagoVehiculo } from '@prisma/client';
+import {
+  IsBoolean,
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+import { EstadoPago, Periodicidad, TipoPagoVehiculo } from '@prisma/client';
 
 export class CreatePagoVehiculoDto {
   @IsEnum(TipoPagoVehiculo)
   tipo: TipoPagoVehiculo;
+
+  @IsOptional()
+  @IsString()
+  autopista?: string;
+
+  @IsOptional()
+  @IsString()
+  numeroBoleta?: string;
 
   @IsEnum(Periodicidad)
   periodicidad: Periodicidad;
@@ -34,4 +52,30 @@ export class CreatePagoVehiculoDto {
   @IsOptional()
   @IsString()
   comprobanteFotoId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  pagado?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  montoPagado?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  esAbono?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  abonoId?: string;
+
+  @IsOptional()
+  @IsEnum(EstadoPago)
+  estado?: EstadoPago;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  fechaPagoReal?: Date;
 }

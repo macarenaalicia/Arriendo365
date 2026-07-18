@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { PERIODOS_PAGO_AUTO_LABELS } from '../api/types';
 import type {
+  ArriendoAuto,
   ArriendoPropiedad,
+  Auto,
   CategoriaPago,
   EstadoArriendo,
   Pago,
+  PeriodoPagoAuto,
   Persona,
   Propiedad,
   Requerimiento,
@@ -101,6 +105,18 @@ const FORM_INICIAL = {
   garantiaMontoPactado: '',
 };
 
+const PERIODOS_PAGO_AUTO: PeriodoPagoAuto[] = ['SEMANAL', 'DOS_SEMANAS', 'MENSUAL'];
+
+const AUTO_FORM_INICIAL = {
+  autoId: '',
+  arrendatarioId: '',
+  kilometrajeEntrega: '',
+  periodoPago: 'MENSUAL' as PeriodoPagoAuto,
+  fechaEntrega: '',
+  periodoAlza: 'ANUAL',
+  montoArriendo: '',
+};
+
 export function ArriendosListPage() {
   const { rol } = useAuth();
   const esStaff = rol !== 'ARRENDATARIO';
@@ -120,6 +136,12 @@ export function ArriendosListPage() {
 
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
+  const [arriendosAuto, setArriendosAuto] = useState<ArriendoAuto[]>([]);
+  const [autos, setAutos] = useState<Auto[]>([]);
+  const [showAutoForm, setShowAutoForm] = useState(false);
+  const [autoForm, setAutoForm] = useState(AUTO_FORM_INICIAL);
+  const [autoFormError, setAutoFormError] = useState<string | null>(null);
+  const [savingAuto, setSavingAuto] = useState(false);
 
   const cargar = () => {
     setLoading(true);
@@ -132,20 +154,29 @@ export function ArriendosListPage() {
       .finally(() => setLoading(false));
   };
 
+  const cargarArriendosAuto = () => {
+    api.get<ArriendoAuto[]>('/arriendos-auto').then(setArriendosAuto);
+  };
+
   useEffect(cargar, [estado]);
+  useEffect(cargarArriendosAuto, []);
   useEffect(() => {
     if (!esStaff) return;
     api.get<Propiedad[]>('/propiedades').then(setPropiedades);
     api.get<Persona[]>('/personas').then(setPersonas);
     api.get<Pago[]>('/pagos').then(setPagos);
     api.get<Requerimiento[]>('/requerimientos').then(setRequerimientos);
+    api.get<Auto[]>('/autos').then(setAutos);
   }, [esStaff]);
 
   useEffect(() => {
     if (esStaff) return;
-    api.get<ArriendoPropiedad[]>('/arriendos-propiedad').then((todos) => {
-      if (todos.length === 1) {
-        navigate(`/arriendos/${todos[0].id}`, { replace: true });
+    Promise.all([
+      api.get<ArriendoPropiedad[]>('/arriendos-propiedad'),
+      api.get<ArriendoAuto[]>('/arriendos-auto'),
+    ]).then(([propiedades, autos]) => {
+      if (propiedades.length === 1 && autos.length === 0) {
+        navigate(`/arriendos/${propiedades[0].id}`, { replace: true });
       }
     });
   }, [esStaff, navigate]);
@@ -190,6 +221,54 @@ export function ArriendosListPage() {
     }
   };
 
+  const cerrarAutoForm = () => {
+    setShowAutoForm(false);
+    setAutoForm(AUTO_FORM_INICIAL);
+    setAutoFormError(null);
+  };
+
+  const handleSubmitAuto = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAutoFormError(null);
+
+    if (
+      !autoForm.autoId ||
+      !autoForm.arrendatarioId ||
+      !autoForm.kilometrajeEntrega ||
+      !autoForm.periodoPago ||
+      !autoForm.fechaEntrega ||
+      !autoForm.montoArriendo
+    ) {
+      setAutoFormError('Completa el auto, el arrendatario y las condiciones del arriendo.');
+      return;
+    }
+
+    const fechaEntrega = ddmmyyyyToIso(autoForm.fechaEntrega);
+    if (!fechaEntrega) {
+      setAutoFormError('Fecha de entrega inválida, usa el formato dd/mm/aaaa.');
+      return;
+    }
+
+    setSavingAuto(true);
+    try {
+      await api.post('/arriendos-auto', {
+        autoId: autoForm.autoId,
+        arrendatarioId: autoForm.arrendatarioId,
+        kilometrajeEntrega: Number(autoForm.kilometrajeEntrega),
+        periodoPago: autoForm.periodoPago,
+        fechaEntrega,
+        periodoAlza: autoForm.periodoAlza,
+        montoArriendo: Number(autoForm.montoArriendo),
+      });
+      cerrarAutoForm();
+      cargarArriendosAuto();
+    } catch (err) {
+      setAutoFormError(err instanceof ApiError ? err.message : 'No se pudo crear el arriendo de auto');
+    } finally {
+      setSavingAuto(false);
+    }
+  };
+
   const arriendosConAlzaPendiente = esStaff
     ? arriendos.filter((a) => {
         if (a.estado !== 'ACTIVO') return false;
@@ -210,13 +289,112 @@ export function ArriendosListPage() {
               </option>
             ))}
           </select>
-          {esStaff && (
-            <button type="button" onClick={() => setShowForm(true)}>
-              + Nuevo arriendo
-            </button>
-          )}
         </div>
       </div>
+
+      {esStaff && showAutoForm && (
+        <Modal titulo="Nuevo arriendo de auto" onClose={cerrarAutoForm}>
+          <form className="inline-form" onSubmit={handleSubmitAuto}>
+            <div className="inline-form__grid">
+              <label>
+                Auto
+                <select
+                  required
+                  value={autoForm.autoId}
+                  onChange={(e) => setAutoForm({ ...autoForm, autoId: e.target.value })}
+                >
+                  <option value="">Elige un auto…</option>
+                  {autos.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.patente}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Arrendatario
+                <select
+                  required
+                  value={autoForm.arrendatarioId}
+                  onChange={(e) => setAutoForm({ ...autoForm, arrendatarioId: e.target.value })}
+                >
+                  <option value="">Elige una persona…</option>
+                  {personas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombreCompleto}
+                      {p.rut ? ` (${p.rut})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Kilometraje de entrega
+                <input
+                  type="number"
+                  min={0}
+                  required
+                  value={autoForm.kilometrajeEntrega}
+                  onChange={(e) => setAutoForm({ ...autoForm, kilometrajeEntrega: e.target.value })}
+                />
+              </label>
+              <label>
+                Periodo de pago
+                <select
+                  required
+                  value={autoForm.periodoPago}
+                  onChange={(e) =>
+                    setAutoForm({ ...autoForm, periodoPago: e.target.value as PeriodoPagoAuto })
+                  }
+                >
+                  {PERIODOS_PAGO_AUTO.map((periodo) => (
+                    <option key={periodo} value={periodo}>
+                      {PERIODOS_PAGO_AUTO_LABELS[periodo]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Fecha de entrega
+                <DateInput
+                  value={autoForm.fechaEntrega}
+                  onChange={(value) => setAutoForm({ ...autoForm, fechaEntrega: value })}
+                  required
+                />
+              </label>
+              <label>
+                Periodo de reajuste
+                <select
+                  required
+                  value={autoForm.periodoAlza}
+                  onChange={(e) => setAutoForm({ ...autoForm, periodoAlza: e.target.value })}
+                >
+                  {PERIODOS_ALZA.map((periodo) => (
+                    <option key={periodo} value={periodo}>
+                      {periodo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Monto arriendo
+                <input
+                  type="number"
+                  min={0}
+                  required
+                  value={autoForm.montoArriendo}
+                  onChange={(e) => setAutoForm({ ...autoForm, montoArriendo: e.target.value })}
+                />
+              </label>
+            </div>
+
+            {autoFormError && <p className="auth-card__error">{autoFormError}</p>}
+
+            <button type="submit" disabled={savingAuto}>
+              {savingAuto ? 'Guardando…' : 'Guardar arriendo'}
+            </button>
+          </form>
+        </Modal>
+      )}
 
       {esStaff && showForm && (
         <Modal titulo="Nuevo arriendo" onClose={cerrarForm}>
@@ -345,21 +523,106 @@ export function ArriendosListPage() {
         </Modal>
       )}
 
-      {loading && <p>Cargando…</p>}
-      {error && <p className="error-text">{error}</p>}
-
-      {!loading && !error && arriendos.length === 0 && (
-        <p className="empty-state">No hay arriendos {estado ? estado.toLowerCase() : ''}.</p>
-      )}
-
-      {esStaff && arriendosConAlzaPendiente.length > 0 && (
-        <div className="alza-banner">
-          <span>
-            {arriendosConAlzaPendiente.length} arriendo
-            {arriendosConAlzaPendiente.length > 1 ? 's' : ''} con reajuste atrasado o próximo
-          </span>
+      <section>
+        <div className="page-header">
+          <h2>Autos</h2>
+          {esStaff && (
+            <button type="button" onClick={() => setShowAutoForm(true)}>
+              + Nuevo arriendo
+            </button>
+          )}
         </div>
-      )}
+        {arriendosAuto.length === 0 && (
+          <p className="empty-state">No hay autos arrendados.</p>
+        )}
+        {arriendosAuto.length > 0 && (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Patente</th>
+                  {esStaff && <th>Arrendatario</th>}
+                  <th>Estado</th>
+                  <th>Monto</th>
+                  <th>Kilometraje de entrega</th>
+                  {esStaff && <th>Reajuste</th>}
+                  <th>{esStaff ? 'Detalle' : 'Pagos y mantenciones'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {arriendosAuto.map((arriendoAuto) => {
+                  const alzaAuto =
+                    esStaff && arriendoAuto.estado === 'ACTIVO'
+                      ? calcularProximaAlza(arriendoAuto.fechaEntrega, arriendoAuto.periodoAlza)
+                      : null;
+                  const alzaAutoVisible =
+                    alzaAuto && (alzaAuto.estado === 'vencido' || alzaAuto.estado === 'proximo')
+                      ? alzaAuto
+                      : null;
+                  return (
+                    <tr key={arriendoAuto.id}>
+                      <td>{arriendoAuto.auto.patente}</td>
+                      {esStaff && <td>{arriendoAuto.arrendatario.nombreCompleto}</td>}
+                      <td>
+                        <span className={`badge badge--${arriendoAuto.estado.toLowerCase()}`}>
+                          {arriendoAuto.estado}
+                        </span>
+                      </td>
+                      <td>{formatMonto(arriendoAuto.montoArriendo)}/mes</td>
+                      <td>{arriendoAuto.kilometrajeEntrega.toLocaleString('es-CL')} km</td>
+                      {esStaff && (
+                        <td>
+                          {alzaAutoVisible ? (
+                            <span className={`badge badge--${alzaAutoVisible.estado}`}>
+                              {ESTADO_ALZA_LABELS[alzaAutoVisible.estado]} ·{' '}
+                              {formatFecha(alzaAutoVisible.fechaIso)}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      )}
+                      <td>
+                        {esStaff ? (
+                          <Link to={`/autos/${arriendoAuto.autoId}`}>Ver auto</Link>
+                        ) : (
+                          <Link to="/pagos">Ver pagos</Link>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="page-header">
+          <h2>Propiedades</h2>
+          {esStaff && (
+            <button type="button" onClick={() => setShowForm(true)}>
+              + Nuevo arriendo
+            </button>
+          )}
+        </div>
+
+        {loading && <p>Cargando…</p>}
+        {error && <p className="error-text">{error}</p>}
+
+        {!loading && !error && arriendos.length === 0 && (
+          <p className="empty-state">No hay arriendos {estado ? estado.toLowerCase() : ''}.</p>
+        )}
+
+        {esStaff && arriendosConAlzaPendiente.length > 0 && (
+          <div className="alza-banner">
+            <span>
+              {arriendosConAlzaPendiente.length} arriendo
+              {arriendosConAlzaPendiente.length > 1 ? 's' : ''} con reajuste atrasado o próximo
+            </span>
+          </div>
+        )}
 
       <div className="table-wrap">
         <table className="table">
@@ -466,6 +729,7 @@ export function ArriendosListPage() {
           </tbody>
         </table>
       </div>
+      </section>
     </div>
   );
 }

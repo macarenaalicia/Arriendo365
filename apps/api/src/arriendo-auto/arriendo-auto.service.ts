@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { CreateArriendoAutoDto } from './dto/create-arriendo-auto.dto';
@@ -35,9 +35,21 @@ export class ArriendoAutoService {
     }
   }
 
+  private async assertSinArriendoActivo(autoId: string, excluirId?: string) {
+    const activo = await this.prisma.arriendoAuto.findFirst({
+      where: { autoId, estado: 'ACTIVO', id: excluirId ? { not: excluirId } : undefined },
+    });
+    if (activo) {
+      throw new ConflictException('Este auto ya tiene un arriendo activo');
+    }
+  }
+
   async create(dto: CreateArriendoAutoDto) {
     await this.assertAutoEnOrganizacion(dto.autoId);
     await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
+    if ((dto.estado ?? 'ACTIVO') === 'ACTIVO') {
+      await this.assertSinArriendoActivo(dto.autoId);
+    }
 
     return this.prisma.arriendoAuto.create({ data: dto, include: DETALLE_INCLUDE });
   }
@@ -73,13 +85,18 @@ export class ArriendoAutoService {
   }
 
   async update(id: string, dto: UpdateArriendoAutoDto) {
-    await this.findOne(id);
+    const actual = await this.findOne(id);
 
     if (dto.autoId) {
       await this.assertAutoEnOrganizacion(dto.autoId);
     }
     if (dto.arrendatarioId) {
       await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
+    }
+
+    const estadoDestino = dto.estado ?? actual.estado;
+    if (estadoDestino === 'ACTIVO') {
+      await this.assertSinArriendoActivo(dto.autoId ?? actual.autoId, id);
     }
 
     return this.prisma.arriendoAuto.update({ where: { id }, data: dto, include: DETALLE_INCLUDE });

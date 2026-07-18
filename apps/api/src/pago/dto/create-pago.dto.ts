@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsDate,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -32,6 +33,16 @@ export class CreatePagoDto {
   @IsOptional()
   @Type(() => Date)
   @IsDate()
+  periodoHasta?: Date;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  kilometraje?: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
   fechaPagoReal?: Date;
 
   @IsNumber()
@@ -51,7 +62,7 @@ export class CreatePagoDto {
   estado?: EstadoPago;
 
   @IsOptional()
-  @IsIn(['ARRIENDO', 'SERVICIOS_BASICOS'])
+  @IsIn(['ARRIENDO', 'SERVICIOS_BASICOS', 'GARANTIA'])
   categoria?: CategoriaPago;
 
   @IsOptional()
