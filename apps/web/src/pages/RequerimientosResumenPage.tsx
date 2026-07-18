@@ -4,7 +4,7 @@ import { api, ApiError } from '../api/client';
 import { descargarCsv } from '../lib/exportarCsv';
 import { subirFoto } from '../lib/fotos';
 import { Modal } from '../components/Modal';
-import { IconEditar, IconEliminar, IconRechazar } from '../components/icons';
+import { IconEditar, IconEliminar, IconReabrir, IconRechazar, IconVer } from '../components/icons';
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import {
   HistorialRequerimientoBoton,
@@ -636,10 +636,30 @@ export function RequerimientosResumenPage() {
                       </td>
                       <td>
                         <div className="table__actions">
-                          <Link to={`/requerimientos/${req.id}`}>Ver</Link>
+                          <HistorialRequerimientoBoton
+                            actualizaciones={req.actualizaciones}
+                            abierto={historialAbierto}
+                            onToggle={() =>
+                              setHistorialAbiertoId(historialAbierto ? null : req.id)
+                            }
+                          />
+                          <Link
+                            to={`/requerimientos/${req.id}`}
+                            className="icon-button"
+                            title="Ver detalle"
+                            aria-label="Ver detalle"
+                          >
+                            <IconVer />
+                          </Link>
                           {req.estado === 'RESUELTO' || req.estado === 'RECHAZADO' ? (
-                            <button type="button" onClick={() => handleReabrir(req.id)}>
-                              Reabrir
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Reabrir"
+                              aria-label="Reabrir"
+                              onClick={() => handleReabrir(req.id)}
+                            >
+                              <IconReabrir />
                             </button>
                           ) : (
                             <>
@@ -672,13 +692,6 @@ export function RequerimientosResumenPage() {
                           >
                             <IconEliminar />
                           </button>
-                          <HistorialRequerimientoBoton
-                            actualizaciones={req.actualizaciones}
-                            abierto={historialAbierto}
-                            onToggle={() =>
-                              setHistorialAbiertoId(historialAbierto ? null : req.id)
-                            }
-                          />
                         </div>
                       </td>
                     </tr>
