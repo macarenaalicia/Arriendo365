@@ -370,6 +370,12 @@ a {
   font-size: 0.7rem;
 }
 
+.nav-dropdown__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+}
+
 .nav-dropdown__panel {
   position: absolute;
   top: 100%;
@@ -400,6 +406,7 @@ a {
 
 .nav-dropdown__panel a:hover {
   background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .nav-dropdown__panel a.active {

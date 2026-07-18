@@ -33,12 +33,11 @@ export function Layout() {
             Arriendos
           </NavLink>
           <NavLink to="/pagos">Pagos</NavLink>
-          {!esArrendatario && <NavLink to="/personas">Personas</NavLink>}
+          <NavLink to="/requerimientos">Requerimientos</NavLink>
           {!esArrendatario && (
             <div
               className={`nav-dropdown${bienesAbierto ? ' nav-dropdown--open' : ''}`}
               onMouseEnter={() => setBienesAbierto(true)}
-              onMouseLeave={() => setBienesAbierto(false)}
             >
               <button
                 type="button"
@@ -49,18 +48,24 @@ export function Layout() {
                 <span className="nav-dropdown__arrow">▾</span>
               </button>
               {bienesAbierto && (
-                <div className="nav-dropdown__panel">
-                  <NavLink to="/propiedades" onClick={() => setBienesAbierto(false)}>
-                    Propiedades
-                  </NavLink>
-                  <NavLink to="/autos" onClick={() => setBienesAbierto(false)}>
-                    Autos
-                  </NavLink>
-                </div>
+                <>
+                  <div
+                    className="nav-dropdown__backdrop"
+                    onClick={() => setBienesAbierto(false)}
+                  />
+                  <div className="nav-dropdown__panel">
+                    <NavLink to="/propiedades" onClick={() => setBienesAbierto(false)}>
+                      Propiedades
+                    </NavLink>
+                    <NavLink to="/autos" onClick={() => setBienesAbierto(false)}>
+                      Autos
+                    </NavLink>
+                  </div>
+                </>
               )}
             </div>
           )}
-          <NavLink to="/requerimientos">Requerimientos</NavLink>
+          {!esArrendatario && <NavLink to="/personas">Personas</NavLink>}
         </nav>
 
         <div className="user-menu">
