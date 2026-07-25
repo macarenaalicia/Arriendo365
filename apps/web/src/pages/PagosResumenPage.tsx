@@ -116,6 +116,7 @@ export function PagosResumenPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [tabTipo, setTabTipo] = useState<'propiedad' | 'auto'>('propiedad');
   const [vista, setVista] = useState<Vista>('default');
   const [filtroEstado, setFiltroEstado] = useState<EstadoPago | ''>('');
   const [filtrosCol, setFiltrosCol] = useState(FILTROS_COLUMNA_INICIAL);
@@ -278,27 +279,41 @@ export function PagosResumenPage() {
   const arriendoLabel = (pago: Pago) =>
     referencias[`${pago.arriendoTipo}-${pago.arriendoId}`]?.label ?? '—';
 
+  const pagosTab = pagos.filter((p) => p.arriendoTipo === tabTipo);
+
+  const resumenTab = ESTADOS_PAGO.reduce(
+    (acc, estado) => {
+      const delEstado = pagosTab.filter((p) => p.estado === estado);
+      acc[estado] = {
+        cantidad: delEstado.length,
+        montoTotal: delEstado.reduce((suma, p) => suma + Number(p.monto), 0),
+      };
+      return acc;
+    },
+    {} as Record<EstadoPago, { cantidad: number; montoTotal: number }>,
+  );
+
   // Opciones "al estilo Excel": solo lo que realmente aparece en los pagos
   // cargados, no un universo fijo — así el filtro siempre tiene sentido.
-  const opcionesArriendo = Array.from(new Set(pagos.map(arriendoLabel))).sort((a, b) =>
+  const opcionesArriendo = Array.from(new Set(pagosTab.map(arriendoLabel))).sort((a, b) =>
     a.localeCompare(b, 'es'),
   );
-  const opcionesMonto = Array.from(new Set(pagos.map((p) => formatMonto(p.monto)))).sort(
+  const opcionesMonto = Array.from(new Set(pagosTab.map((p) => formatMonto(p.monto)))).sort(
     (a, b) => Number(a.replace(/\D/g, '')) - Number(b.replace(/\D/g, '')),
   );
-  const opcionesFechaPago = Array.from(new Set(pagos.map((p) => p.periodo.slice(0, 7))))
+  const opcionesFechaPago = Array.from(new Set(pagosTab.map((p) => p.periodo.slice(0, 7))))
     .sort()
     .reverse();
   const opcionesPeriodoPago = Array.from(
-    new Set(pagos.map((p) => p.fechaComprometida.slice(0, 7))),
+    new Set(pagosTab.map((p) => p.fechaComprometida.slice(0, 7))),
   )
     .sort()
     .reverse();
   const opcionesMedioPago = Array.from(
-    new Set(pagos.map((p) => p.medioPago).filter((m): m is string => Boolean(m))),
+    new Set(pagosTab.map((p) => p.medioPago).filter((m): m is string => Boolean(m))),
   ).sort((a, b) => a.localeCompare(b, 'es'));
 
-  const pagosFiltrados = pagos
+  const pagosFiltrados = pagosTab
     .filter((pago) => {
       if (filtroEstado && pago.estado !== filtroEstado) return false;
       if (vista === 'pendientes') return pago.aprobado === null;
@@ -331,8 +346,25 @@ export function PagosResumenPage() {
     <div>
       <h1>Resumen de pagos</h1>
 
+      <div className="tabs">
+        <button
+          type="button"
+          className={`tabs__button${tabTipo === 'propiedad' ? ' tabs__button--active' : ''}`}
+          onClick={() => setTabTipo('propiedad')}
+        >
+          Propiedades
+        </button>
+        <button
+          type="button"
+          className={`tabs__button${tabTipo === 'auto' ? ' tabs__button--active' : ''}`}
+          onClick={() => setTabTipo('auto')}
+        >
+          Autos
+        </button>
+      </div>
+
       <div className="stat-grid">
-        {(Object.entries(resumen.porEstado) as [EstadoPago, { cantidad: number; montoTotal: number }][]).map(
+        {(Object.entries(resumenTab) as [EstadoPago, { cantidad: number; montoTotal: number }][]).map(
           ([estado, datos]) => (
             <div key={estado} className={`stat-card stat-card--${estado.toLowerCase()}`}>
               <span className="stat-card__label">{ESTADO_LABELS[estado]}</span>
@@ -377,7 +409,9 @@ export function PagosResumenPage() {
                     onChange={(e) => setCreateForm({ ...createForm, arriendoKey: e.target.value })}
                   >
                     <option value="">Elige un arriendo…</option>
-                    {arriendosDisponibles.map((o) => (
+                    {arriendosDisponibles
+                      .filter((o) => o.arriendoTipo === tabTipo)
+                      .map((o) => (
                       <option key={o.key} value={o.key}>
                         {o.label}
                       </option>
