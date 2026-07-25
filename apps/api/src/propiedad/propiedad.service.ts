@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
@@ -60,7 +60,20 @@ export class PropiedadService {
 
   async remove(id: string) {
     await this.findOne(id);
-    await this.prisma.propiedad.delete({ where: { id } });
+
+    const tieneArriendos = await this.prisma.arriendoPropiedad.findFirst({
+      where: { propiedadId: id },
+    });
+    if (tieneArriendos) {
+      throw new ConflictException(
+        'No se puede eliminar una propiedad que tiene arriendos registrados.',
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.proveedor.deleteMany({ where: { propiedadId: id } }),
+      this.prisma.propiedad.delete({ where: { id } }),
+    ]);
   }
 
   async duplicar(id: string) {

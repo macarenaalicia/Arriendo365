@@ -117,6 +117,7 @@ export function PropiedadesListPage() {
   const { organizacionId } = useAuth();
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const tour = useOnboardingTour('propiedades');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -222,9 +223,11 @@ export function PropiedadesListPage() {
 
   const cargar = () => {
     setLoading(true);
+    setLoadError(null);
     api
       .get<Propiedad[]>('/propiedades')
       .then(setPropiedades)
+      .catch(() => setLoadError('No se pudo cargar la información de las propiedades'))
       .finally(() => setLoading(false));
   };
 
@@ -1233,11 +1236,13 @@ export function PropiedadesListPage() {
 
       {loading && <p>Cargando…</p>}
 
-      {!loading && propiedades.length === 0 && (
+      {!loading && loadError && <p className="error-text">{loadError}</p>}
+
+      {!loading && !loadError && propiedades.length === 0 && (
         <p className="empty-state">Aún no has agregado propiedades.</p>
       )}
 
-      {!loading && propiedades.length > 0 && (
+      {!loading && !loadError && propiedades.length > 0 && (
         <div className="table-wrap" data-tour="propiedades-tabla">
           <table className="table">
             <thead>
