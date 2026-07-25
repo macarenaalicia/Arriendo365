@@ -31,7 +31,7 @@ type ArriendoPropiedadDetalle = ArriendoPropiedad & {
 };
 
 type RequerimientoDetalle = Requerimiento & {
-  arriendoPropiedad: { propiedad: Propiedad };
+  arriendoPropiedad: { propiedad: Propiedad; arrendatario: Persona };
   tecnico: Persona | null;
   calificacion: CalificacionRequerimiento;
 };
@@ -93,47 +93,127 @@ export class PdfService {
     });
   }
 
-  generarRequerimiento(requerimiento: RequerimientoDetalle, mostrarGastos: boolean): Promise<Buffer> {
+  /**
+   * Formato "orden de trabajo": pensado para imprimir y llevar a la
+   * propiedad, no solo para leer en pantalla. Los campos que normalmente se
+   * completan durante la visita (inspección, resolución, gastos) llevan
+   * líneas en blanco debajo aunque ya tengan texto, para poder anotar a mano.
+   */
+  generarRequerimiento(
+    requerimiento: RequerimientoDetalle,
+    mostrarInspeccion: boolean,
+    mostrarGastos: boolean,
+  ): Promise<Buffer> {
     return generarPdfBuffer((doc) => {
       const propiedad = requerimiento.arriendoPropiedad.propiedad;
+      const arrendatario = requerimiento.arriendoPropiedad.arrendatario;
       const direccion = `${propiedad.calle} ${propiedad.numero}`;
+      const pageLeft = doc.page.margins.left;
+      const pageRight = doc.page.width - doc.page.margins.right;
 
-      doc.fontSize(18).text('Requerimiento', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(10).fillColor('#555').text(`Generado el ${formatFecha(new Date())}`, { align: 'center' });
+      // Caja con Urgencia/Calificación arriba a la derecha.
+      const cajaAncho = 160;
+      const cajaX = pageRight - cajaAncho;
+      const cajaY = doc.page.margins.top;
+      const cajaAlto = 40;
+      doc.rect(cajaX, cajaY, cajaAncho, cajaAlto).stroke();
+      doc
+        .moveTo(cajaX, cajaY + cajaAlto / 2)
+        .lineTo(cajaX + cajaAncho, cajaY + cajaAlto / 2)
+        .stroke();
+      doc
+        .moveTo(cajaX + 75, cajaY)
+        .lineTo(cajaX + 75, cajaY + cajaAlto)
+        .stroke();
+      doc.fontSize(9).font('Helvetica-Bold');
+      doc.text('Urgencia', cajaX + 5, cajaY + 5, { width: 66 });
+      doc.text('Calificación', cajaX + 5, cajaY + cajaAlto / 2 + 5, { width: 66 });
+      doc.font('Helvetica');
+      doc.text(requerimiento.urgencia, cajaX + 80, cajaY + 5, { width: cajaAncho - 85 });
+      doc.text(requerimiento.calificacion.nombre, cajaX + 80, cajaY + cajaAlto / 2 + 5, {
+        width: cajaAncho - 85,
+      });
+
+      // Título y fecha, a la izquierda de la caja.
+      doc
+        .fontSize(16)
+        .font('Helvetica-Bold')
+        .text('Orden de trabajo — Requerimiento', pageLeft, cajaY, { width: cajaAncho - 20 });
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#555')
+        .text(`Generado el ${formatFecha(new Date())}`, pageLeft, doc.y + 2);
       doc.fillColor('black');
+
+      doc.y = Math.max(doc.y, cajaY + cajaAlto) + 18;
+      doc.x = pageLeft;
+
+      const campo = (label: string, value: string) => {
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text(`${label}: `, pageLeft, doc.y, { continued: true });
+        doc.font('Helvetica').text(value);
+      };
+
+      campo('Propiedad', direccion);
+      campo('Arrendatario', arrendatario.nombreCompleto);
+      if (arrendatario.telefono) campo('Contacto', arrendatario.telefono);
+      campo('Estado', requerimiento.estado.replace(/_/g, ' '));
+      campo('Técnico', requerimiento.tecnico?.nombreCompleto ?? 'Sin asignar');
+      doc.moveDown();
+
+      const lineaEnBlanco = () => {
+        const y = doc.y + 16;
+        doc
+          .moveTo(pageLeft, y)
+          .lineTo(pageRight, y)
+          .strokeColor('#bbbbbb')
+          .stroke()
+          .strokeColor('black');
+        doc.y = y + 2;
+      };
+
+      const seccion = (titulo: string, texto: string | null, lineasVacias: number) => {
+        doc.fontSize(12).font('Helvetica-Bold').text(`${titulo}:`, pageLeft, doc.y);
+        doc.font('Helvetica').fontSize(11);
+        if (texto) doc.text(texto, pageLeft, doc.y + 2, { width: pageRight - pageLeft });
+        for (let i = 0; i < lineasVacias; i++) lineaEnBlanco();
+        doc.moveDown(0.6);
+      };
+
+      seccion('Descripción', requerimiento.notasArrendatario || '—', 0);
+
+      if (mostrarInspeccion) {
+        seccion('Inspección', requerimiento.inspeccion, 3);
+        seccion('Detalle de resolución', requerimiento.detalleResolucion, 3);
+      }
+
+      if (mostrarGastos) {
+        seccion('Detalle de gastos', requerimiento.detalleGasto, 4);
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text('Total gasto: ', pageLeft, doc.y, { continued: true });
+        doc
+          .font('Helvetica')
+          .text(requerimiento.totalGasto !== null ? formatMonto(requerimiento.totalGasto) : '_______________');
+        doc.moveDown();
+      }
+
       doc.moveDown(2);
-
-      doc.fontSize(11);
-      doc.text(`Propiedad: ${direccion}`);
-      doc.text(`Urgencia: ${requerimiento.urgencia}`);
-      doc.text(`Calificación: ${requerimiento.calificacion.nombre}`);
-      doc.text(`Estado: ${requerimiento.estado.replace(/_/g, ' ')}`);
-      doc.text(`Técnico asignado: ${requerimiento.tecnico?.nombreCompleto ?? 'Sin asignar'}`);
-      doc.moveDown();
-
-      doc.fontSize(13).text('Descripción del arrendatario');
-      doc.fontSize(11).text(requerimiento.notasArrendatario || '—');
-      doc.moveDown();
-
-      if (requerimiento.detalleResolucion) {
-        doc.fontSize(13).text('Detalle de resolución');
-        doc.fontSize(11).text(requerimiento.detalleResolucion);
-        doc.moveDown();
-      }
-
-      if (requerimiento.inspeccion) {
-        doc.fontSize(13).text('Inspección');
-        doc.fontSize(11).text(requerimiento.inspeccion);
-        doc.moveDown();
-      }
-
-      if (mostrarGastos && (requerimiento.detalleGasto || requerimiento.totalGasto !== null)) {
-        doc.fontSize(13).text('Gasto');
-        doc.fontSize(11);
-        if (requerimiento.detalleGasto) doc.text(requerimiento.detalleGasto);
-        if (requerimiento.totalGasto !== null) doc.text(`Total: ${formatMonto(requerimiento.totalGasto)}`);
-      }
+      const firmaY = doc.y;
+      doc
+        .moveTo(pageLeft, firmaY)
+        .lineTo(pageLeft + 200, firmaY)
+        .stroke();
+      doc
+        .moveTo(pageLeft + 280, firmaY)
+        .lineTo(pageLeft + 480, firmaY)
+        .stroke();
+      doc.fontSize(9).font('Helvetica').text('Firma técnico', pageLeft, firmaY + 4);
+      doc.text('Fecha', pageLeft + 280, firmaY + 4);
     });
   }
 }

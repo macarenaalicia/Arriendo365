@@ -10,7 +10,7 @@ import { UpdateRequerimientoDto } from './dto/update-requerimiento.dto';
 import { FindRequerimientosDto } from './dto/find-requerimientos.dto';
 
 const DETALLE_INCLUDE = {
-  arriendoPropiedad: { include: { propiedad: true } },
+  arriendoPropiedad: { include: { propiedad: true, arrendatario: true } },
   tecnico: true,
   calificacion: true,
   presupuestos: true,
@@ -195,7 +195,11 @@ export class RequerimientoService {
 
   async generarPdf(id: string) {
     const requerimiento = this.ocultarCamposGasto(await this.findOne(id));
-    return this.pdf.generarRequerimiento(requerimiento, ROLES_GASTO.includes(this.tenant.rol));
+    return this.pdf.generarRequerimiento(
+      requerimiento,
+      ROLES_INSPECCION.includes(this.tenant.rol),
+      ROLES_GASTO.includes(this.tenant.rol),
+    );
   }
 
   private huboCambios(
