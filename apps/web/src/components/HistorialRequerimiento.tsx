@@ -61,7 +61,7 @@ export function HistorialRequerimientoFilas({ actualizaciones, colSpan }: FilasP
               <tr>
                 <th>Fecha</th>
                 <th>Urgencia</th>
-                <th>Tipo</th>
+                <th>Calificación</th>
                 <th>Estado</th>
                 <th>Técnico</th>
                 <th>Descripción</th>
@@ -75,11 +75,7 @@ export function HistorialRequerimientoFilas({ actualizaciones, colSpan }: FilasP
                   <td>
                     <span className={`badge badge--${a.urgencia.toLowerCase()}`}>{a.urgencia}</span>
                   </td>
-                  <td>
-                    <span className={`badge badge--${a.tipoReparacion.toLowerCase()}`}>
-                      {a.tipoReparacion}
-                    </span>
-                  </td>
+                  <td>{a.calificacion.nombre}</td>
                   <td>
                     <span className={`badge badge--${a.estado.toLowerCase()}`}>
                       {a.estado.replace(/_/g, ' ')}

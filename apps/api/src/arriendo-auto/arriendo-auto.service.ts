@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
 import { CreateArriendoAutoDto } from './dto/create-arriendo-auto.dto';
 import { UpdateArriendoAutoDto } from './dto/update-arriendo-auto.dto';
 import { FindArriendosAutoDto } from './dto/find-arriendos-auto.dto';
@@ -15,6 +16,7 @@ export class ArriendoAutoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   private async assertAutoEnOrganizacion(autoId: string) {
@@ -54,10 +56,14 @@ export class ArriendoAutoService {
     return this.prisma.arriendoAuto.create({ data: dto, include: DETALLE_INCLUDE });
   }
 
-  findAll(query: FindArriendosAutoDto) {
+  async findAll(query: FindArriendosAutoDto) {
+    const { autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
     return this.prisma.arriendoAuto.findMany({
       where: {
-        auto: { organizacionId: this.tenant.organizacionId },
+        auto: {
+          organizacionId: this.tenant.organizacionId,
+          ...(autoIds ? { id: { in: autoIds } } : {}),
+        },
         estado: query.estado,
         autoId: query.autoId,
         arrendatarioId: this.tenant.esArrendatario ? this.tenant.personaId : undefined,
@@ -68,10 +74,12 @@ export class ArriendoAutoService {
   }
 
   async findOne(id: string) {
+    const { autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
     const arriendo = await this.prisma.arriendoAuto.findFirst({
       where: {
         id,
         auto: { organizacionId: this.tenant.organizacionId },
+        ...(autoIds ? { autoId: { in: autoIds } } : {}),
         arrendatarioId: this.tenant.esArrendatario ? this.tenant.personaId : undefined,
       },
       include: DETALLE_INCLUDE,

@@ -7,6 +7,7 @@ export interface TenantClsStore extends ClsStore {
   usuarioId: string;
   personaId: string;
   rol: RolUsuario;
+  esSuperAdmin: boolean;
 }
 
 @Injectable()
@@ -18,6 +19,7 @@ export class TenantContextService {
     this.cls.set('usuarioId', store.usuarioId);
     this.cls.set('personaId', store.personaId);
     this.cls.set('rol', store.rol);
+    this.cls.set('esSuperAdmin', store.esSuperAdmin);
   }
 
   get organizacionId(): string {
@@ -38,5 +40,9 @@ export class TenantContextService {
 
   get esArrendatario(): boolean {
     return this.rol === RolUsuario.ARRENDATARIO;
+  }
+
+  get esSuperAdmin(): boolean {
+    return this.cls.get('esSuperAdmin') === true;
   }
 }

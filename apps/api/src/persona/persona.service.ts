@@ -1,8 +1,18 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { RolUsuario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { CreatePersonaDto } from './dto/create-persona.dto';
 import { UpdatePersonaDto } from './dto/update-persona.dto';
+
+const SALT_ROUNDS = 10;
+export const PASSWORD_INICIAL = '1234';
+
+// Perfiles que corresponden a un uso real de la plataforma. TECNICO y
+// CODEUDOR nunca reciben Usuario: el técnico solo necesita ser asignado a
+// requerimientos, y el codeudor es solo un co-firmante del contrato.
+const PERFILES_CON_ACCESO: RolUsuario[] = ['ADMINISTRADOR', 'PROPIETARIO', 'ARRENDATARIO'];
 
 @Injectable()
 export class PersonaService {
@@ -23,13 +33,32 @@ export class PersonaService {
       }
     }
 
-    return this.prisma.persona.create({
-      data: {
-        ...datos,
-        organizacionId: this.tenant.organizacionId,
-        recomendaciones: recomendaciones ? { create: recomendaciones } : undefined,
-      },
-      include: { recomendaciones: true },
+    const organizacionId = this.tenant.organizacionId;
+
+    return this.prisma.$transaction(async (tx) => {
+      const persona = await tx.persona.create({
+        data: {
+          ...datos,
+          organizacionId,
+          recomendaciones: recomendaciones ? { create: recomendaciones } : undefined,
+        },
+        include: { recomendaciones: true },
+      });
+
+      if (dto.tipoPersona && PERFILES_CON_ACCESO.includes(dto.tipoPersona as RolUsuario)) {
+        const passwordHash = await bcrypt.hash(PASSWORD_INICIAL, SALT_ROUNDS);
+        await tx.usuario.create({
+          data: {
+            organizacionId,
+            personaId: persona.id,
+            rol: dto.tipoPersona as RolUsuario,
+            passwordHash,
+            debeCambiarPassword: true,
+          },
+        });
+      }
+
+      return persona;
     });
   }
 

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { MailService } from '../mail/mail.service';
+import { PdfService } from '../pdf/pdf.service';
 import { CreateRequerimientoDto } from './dto/create-requerimiento.dto';
 import { UpdateRequerimientoDto } from './dto/update-requerimiento.dto';
 import { FindRequerimientosDto } from './dto/find-requerimientos.dto';
@@ -11,16 +12,26 @@ import { FindRequerimientosDto } from './dto/find-requerimientos.dto';
 const DETALLE_INCLUDE = {
   arriendoPropiedad: { include: { propiedad: true } },
   tecnico: true,
+  calificacion: true,
   presupuestos: true,
   gastos: true,
   actualizaciones: {
     include: {
       tecnico: true,
+      calificacion: true,
       usuario: { select: { id: true, rol: true, persona: true } },
     },
     orderBy: { createdAt: 'desc' },
   },
 } as const;
+
+type RequerimientoDetalle = Prisma.RequerimientoGetPayload<{ include: typeof DETALLE_INCLUDE }>;
+
+// inspeccion es visible y editable por propietario/administrador.
+const ROLES_INSPECCION: readonly string[] = ['ADMINISTRADOR', 'PROPIETARIO'];
+// detalleGasto/totalGasto son visibles y editables solo por el propietario
+// (información de costos internos, ni siquiera el administrador la ve).
+const ROLES_GASTO: readonly string[] = ['PROPIETARIO'];
 
 @Injectable()
 export class RequerimientoService {
@@ -29,6 +40,7 @@ export class RequerimientoService {
     private readonly tenant: TenantContextService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly pdf: PdfService,
   ) {}
 
   private async notificarNuevoRequerimiento(
@@ -61,7 +73,7 @@ export class RequerimientoService {
           <h2>Nuevo requerimiento reportado</h2>
           <p><strong>Propiedad:</strong> ${direccion}</p>
           <p><strong>Urgencia:</strong> ${requerimiento.urgencia}</p>
-          <p><strong>Tipo:</strong> ${requerimiento.tipoReparacion}</p>
+          <p><strong>Calificación:</strong> ${requerimiento.calificacion.nombre}</p>
           ${requerimiento.notasArrendatario ? `<p><strong>Descripción:</strong> ${requerimiento.notasArrendatario}</p>` : ''}
           <p style="margin-top: 24px;">
             <a href="${url}" style="background: #4f46e5; color: #fff; padding: 12px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
@@ -102,6 +114,17 @@ export class RequerimientoService {
     }
   }
 
+  private ocultarCamposGasto<T extends { inspeccion: string | null; detalleGasto: string | null; totalGasto: unknown }>(
+    requerimiento: T,
+  ): T {
+    return {
+      ...requerimiento,
+      inspeccion: ROLES_INSPECCION.includes(this.tenant.rol) ? requerimiento.inspeccion : null,
+      detalleGasto: ROLES_GASTO.includes(this.tenant.rol) ? requerimiento.detalleGasto : null,
+      totalGasto: ROLES_GASTO.includes(this.tenant.rol) ? requerimiento.totalGasto : null,
+    };
+  }
+
   async create(dto: CreateRequerimientoDto) {
     await this.assertArriendoPropiedadEnOrganizacion(dto.arriendoPropiedadId);
     if (dto.tecnicoId) {
@@ -109,6 +132,13 @@ export class RequerimientoService {
     }
 
     const { presupuestos, ...datos } = dto;
+    if (!ROLES_INSPECCION.includes(this.tenant.rol)) {
+      datos.inspeccion = undefined;
+    }
+    if (!ROLES_GASTO.includes(this.tenant.rol)) {
+      datos.detalleGasto = undefined;
+      datos.totalGasto = undefined;
+    }
 
     const requerimiento = await this.prisma.requerimiento.create({
       data: {
@@ -120,11 +150,11 @@ export class RequerimientoService {
 
     await this.notificarNuevoRequerimiento(requerimiento);
 
-    return requerimiento;
+    return this.ocultarCamposGasto(requerimiento);
   }
 
-  findAll(query: FindRequerimientosDto) {
-    return this.prisma.requerimiento.findMany({
+  async findAll(query: FindRequerimientosDto) {
+    const requerimientos = await this.prisma.requerimiento.findMany({
       where: {
         arriendoPropiedad: {
           id: query.arriendoPropiedadId,
@@ -137,9 +167,10 @@ export class RequerimientoService {
       include: DETALLE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
+    return requerimientos.map((r) => this.ocultarCamposGasto(r));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string): Promise<RequerimientoDetalle> {
     const requerimiento = await this.prisma.requerimiento.findFirst({
       where: {
         id,
@@ -158,6 +189,15 @@ export class RequerimientoService {
     return requerimiento;
   }
 
+  async obtenerParaMostrar(id: string) {
+    return this.ocultarCamposGasto(await this.findOne(id));
+  }
+
+  async generarPdf(id: string) {
+    const requerimiento = this.ocultarCamposGasto(await this.findOne(id));
+    return this.pdf.generarRequerimiento(requerimiento, ROLES_GASTO.includes(this.tenant.rol));
+  }
+
   private huboCambios(
     actual: Awaited<ReturnType<RequerimientoService['findOne']>>,
     dto: UpdateRequerimientoDto,
@@ -167,7 +207,7 @@ export class RequerimientoService {
     }
     if (dto.urgencia !== undefined && dto.urgencia !== actual.urgencia) return true;
     if (dto.estado !== undefined && dto.estado !== actual.estado) return true;
-    if (dto.tipoReparacion !== undefined && dto.tipoReparacion !== actual.tipoReparacion) return true;
+    if (dto.calificacionId !== undefined && dto.calificacionId !== actual.calificacionId) return true;
     if (dto.tecnicoId !== undefined && dto.tecnicoId !== actual.tecnicoId) return true;
     if (dto.notasArrendatario !== undefined && dto.notasArrendatario !== actual.notasArrendatario) {
       return true;
@@ -188,8 +228,6 @@ export class RequerimientoService {
     ) {
       return true;
     }
-    if (dto.valorPagado !== undefined && Number(actual.valorPagado) !== dto.valorPagado) return true;
-    if (dto.quienPago !== undefined && dto.quienPago !== actual.quienPago) return true;
 
     return false;
   }
@@ -206,8 +244,15 @@ export class RequerimientoService {
 
     const cambia = this.huboCambios(actual, dto);
     const { notaActualizacion, ...datos } = dto;
+    if (!ROLES_INSPECCION.includes(this.tenant.rol)) {
+      datos.inspeccion = undefined;
+    }
+    if (!ROLES_GASTO.includes(this.tenant.rol)) {
+      datos.detalleGasto = undefined;
+      datos.totalGasto = undefined;
+    }
 
-    return this.prisma.requerimiento.update({
+    const actualizado = await this.prisma.requerimiento.update({
       where: { id },
       data: {
         ...datos,
@@ -219,7 +264,7 @@ export class RequerimientoService {
               create: {
                 urgencia: actual.urgencia,
                 estado: actual.estado,
-                tipoReparacion: actual.tipoReparacion,
+                calificacionId: actual.calificacionId,
                 tecnicoId: actual.tecnicoId,
                 notasArrendatario: actual.notasArrendatario,
                 detalleResolucion: actual.detalleResolucion,
@@ -231,6 +276,8 @@ export class RequerimientoService {
       },
       include: DETALLE_INCLUDE,
     });
+
+    return this.ocultarCamposGasto(actualizado);
   }
 
   async remove(id: string) {

@@ -8,8 +8,9 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { RolUsuario } from '@prisma/client';
+import { PerfilPersona } from '@prisma/client';
 import { CreatePersonaRecomendacionDto } from './create-persona-recomendacion.dto';
+import { IsRutChileno } from '../../common/validators/rut.validator';
 
 export class CreatePersonaDto {
   @IsString()
@@ -17,11 +18,12 @@ export class CreatePersonaDto {
 
   @IsOptional()
   @IsString()
+  @IsRutChileno()
   rut?: string;
 
   @IsOptional()
-  @IsEnum(RolUsuario)
-  tipoPersona?: RolUsuario;
+  @IsEnum(PerfilPersona)
+  tipoPersona?: PerfilPersona;
 
   @IsOptional()
   @Type(() => Date)

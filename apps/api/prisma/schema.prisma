@@ -16,6 +16,23 @@ enum RolUsuario {
   TECNICO
 }
 
+// Categoriza a una Persona (independiente de si tiene o no acceso a la
+// plataforma). Superconjunto de RolUsuario: agrega CODEUDOR, que nunca
+// puede tener un Usuario propio.
+enum PerfilPersona {
+  ADMINISTRADOR
+  PROPIETARIO
+  ARRENDATARIO
+  TECNICO
+  CODEUDOR
+}
+
+enum EstadoOrganizacion {
+  PENDIENTE_APROBACION
+  ACTIVA
+  RECHAZADA
+}
+
 enum TipoPropiedad {
   CASA
   DEPARTAMENTO
@@ -76,11 +93,6 @@ enum EstadoRequerimiento {
   REABIERTO
 }
 
-enum TipoReparacion {
-  ESTRUCTURAL
-  LOCATIVA
-}
-
 enum QuienPago {
   PROPIETARIO
   ARRENDATARIO
@@ -137,10 +149,25 @@ enum TipoCobroAuto {
 // ---------- TENANT ----------
 
 model Organizacion {
-  id        String   @id @default(uuid())
+  id        String             @id @default(uuid())
   nombre    String
   plan      String?
-  activo    Boolean  @default(true)
+  activo    Boolean            @default(true)
+  // Toda organización nueva nace pendiente de aprobación del dueño de la
+  // plataforma (SUPER_ADMIN_EMAIL). Las que ya existían al agregar este
+  // campo quedan ACTIVA (ver migración) para no bloquear a nadie.
+  estado    EstadoOrganizacion @default(PENDIENTE_APROBACION)
+  // Fecha hasta la que la organización puede operar: fin del trial de 7
+  // días al aprobarla, o fin del período pagado tras marcar un pago. Si es
+  // null, no vence (así quedan las organizaciones ya existentes).
+  vigenteHasta    DateTime?
+  fechaAprobacion DateTime?
+  // Gancho para un proveedor de pago real más adelante (Webpay/Flow/etc.);
+  // por ahora el único valor posible es "MANUAL" (el dueño de la
+  // plataforma marca el pago a mano tras recibir una transferencia).
+  metodoPago      String?
+  ultimoPagoFecha DateTime?
+  ultimoPagoMonto Decimal?           @db.Decimal(10, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -160,11 +187,16 @@ model Usuario {
   persona        Persona      @relation(fields: [personaId], references: [id])
   rol            RolUsuario
   passwordHash   String
+  // true cuando la contraseña fue asignada por un tercero (creación con
+  // clave inicial "1234" o reseteo por un administrador) y la persona aún
+  // no la cambia por una propia — se le exige cambiarla al iniciar sesión.
+  debeCambiarPassword Boolean @default(false)
   activo         Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   actualizacionesRequerimiento RequerimientoActualizacion[]
+  bienesAdministrados          AdministradorBien[]
 
   @@map("usuario")
 }
@@ -180,10 +212,11 @@ model Persona {
   // pide RUT ni el resto de los datos legales que sí necesita un
   // arrendatario/codeudor.
   rut                   String?
-  // Categoriza a la persona (ej. técnico, arrendatario) independiente de si
-  // tiene o no un Usuario con acceso a la plataforma — un técnico no
-  // necesita login para poder ser asignado a un requerimiento.
-  tipoPersona           RolUsuario?
+  // Categoriza a la persona (ej. técnico, arrendatario, codeudor)
+  // independiente de si tiene o no un Usuario con acceso a la plataforma —
+  // un técnico no necesita login para poder ser asignado a un
+  // requerimiento, y un codeudor nunca tiene Usuario propio.
+  tipoPersona           PerfilPersona?
   fechaNacimiento       DateTime?
   direccion             String?
   telefono              String?
@@ -279,11 +312,16 @@ model Propiedad {
   // Precio de referencia para publicar la propiedad en la vista pública
   // mientras está DISPONIBLE (no es el monto de un contrato de arriendo).
   precioArriendoEsperado Decimal?        @db.Decimal(10, 2)
+  // Datos de la inscripción de dominio en el Conservador de Bienes Raíces.
+  fojasInscripcion       String?
+  numeroInscripcion      String?
+  anioInscripcion        Int?
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
 
-  proveedores Proveedor[]
-  arriendos   ArriendoPropiedad[]
+  proveedores  Proveedor[]
+  arriendos    ArriendoPropiedad[]
+  administrada AdministradorBien[]
 
   @@map("propiedad")
 }
@@ -314,6 +352,11 @@ model ArriendoPropiedad {
   fechaEntrega            DateTime
   fechaRecepcion          DateTime?
   periodoAlza             String
+  // % de IPC pactado a aplicar sobre montoArriendo cada vez que se cumple
+  // periodoAlza desde ultimaAlzaFecha (o fechaEntrega si nunca se ha
+  // aplicado un reajuste).
+  ipcPorcentaje           Decimal?       @db.Decimal(5, 2)
+  ultimaAlzaFecha         DateTime?
   garantia                Boolean        @default(false)
   garantiaMontoPactado    Decimal?       @db.Decimal(10, 2)
   garantiaMontoPagado     Decimal?       @db.Decimal(10, 2)
@@ -386,14 +429,17 @@ model Requerimiento {
   estado              EstadoRequerimiento   @default(PENDIENTE_REVISION)
   tecnicoId           String?
   tecnico             Persona?              @relation(fields: [tecnicoId], references: [id])
-  tipoReparacion      TipoReparacion
+  calificacionId      String
+  calificacion        CalificacionRequerimiento @relation(fields: [calificacionId], references: [id])
   detalleResolucion   String?
   notasInternas       String?
   notasArrendatario   String?
+  // Visibles solo para propietario/administrador.
+  inspeccion          String?
+  detalleGasto        String?
+  totalGasto          Decimal?              @db.Decimal(10, 2)
   fechaComprometida   DateTime?
   fechaSolucion       DateTime?
-  valorPagado         Decimal?              @db.Decimal(10, 2)
-  quienPago           QuienPago?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
@@ -402,6 +448,18 @@ model Requerimiento {
   actualizaciones RequerimientoActualizacion[]
 
   @@map("requerimiento")
+}
+
+// Catálogo seleccionable (mantenedor) que reemplaza al antiguo texto libre
+// "tipo de reparación" — mismo patrón que ConfiguracionMantencion para autos.
+model CalificacionRequerimiento {
+  id     String @id @default(uuid())
+  nombre String
+
+  requerimientos  Requerimiento[]
+  actualizaciones RequerimientoActualizacion[]
+
+  @@map("calificacion_requerimiento")
 }
 
 // Guarda el estado ANTERIOR del requerimiento justo antes de cada edición
@@ -413,7 +471,8 @@ model RequerimientoActualizacion {
   requerimiento     Requerimiento         @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
   urgencia          UrgenciaRequerimiento
   estado            EstadoRequerimiento
-  tipoReparacion    TipoReparacion
+  calificacionId    String
+  calificacion      CalificacionRequerimiento @relation(fields: [calificacionId], references: [id])
   tecnicoId         String?
   tecnico           Persona?              @relation(fields: [tecnicoId], references: [id])
   notasArrendatario String?
@@ -468,9 +527,26 @@ model Auto {
   arriendos     ArriendoAuto[]
   pagosVehiculo PagoVehiculo[]
   cobros        CobroAuto[]
+  administrado  AdministradorBien[]
 
   @@unique([organizacionId, patente])
   @@map("auto")
+}
+
+// Acota a un Usuario con rol ADMINISTRADOR a solo una o más propiedades/autos
+// puntuales, en vez de a toda la organización (si un ADMINISTRADOR no tiene
+// filas aquí, sigue viendo todos los bienes de su organización como hoy).
+model AdministradorBien {
+  id          String     @id @default(uuid())
+  usuarioId   String
+  usuario     Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  propiedadId String?
+  propiedad   Propiedad? @relation(fields: [propiedadId], references: [id], onDelete: Cascade)
+  autoId      String?
+  auto        Auto?      @relation(fields: [autoId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+
+  @@map("administrador_bien")
 }
 
 model DocumentoAuto {

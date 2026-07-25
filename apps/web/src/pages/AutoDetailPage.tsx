@@ -430,6 +430,14 @@ export function AutoDetailPage() {
     setShowNuevaConfig(false);
   };
 
+  const handleRenombrarConfiguracion = async (c: ConfiguracionMantencion) => {
+    const nuevoNombre = prompt('Nuevo nombre para este tipo de mantención:', c.tipo);
+    if (!nuevoNombre || !nuevoNombre.trim() || nuevoNombre.trim() === c.tipo) return;
+    await api.patch(`/configuraciones-mantencion/${c.id}`, { tipo: nuevoNombre.trim() });
+    const lista = await api.get<ConfiguracionMantencion[]>('/configuraciones-mantencion');
+    setConfiguraciones(lista);
+  };
+
   const handleGuardarMantencion = async () => {
     if (!id) return;
     if (
@@ -2206,14 +2214,25 @@ export function AutoDetailPage() {
 
             <div className="tipo-mantencion-checks">
               {configuraciones.map((c) => (
-                <label key={c.id} className="checkbox">
-                  <input
-                    type="checkbox"
-                    checked={mantencionForm.configuracionIds.includes(c.id)}
-                    onChange={() => toggleTipoMantencion(c.id)}
-                  />
-                  {c.tipo}
-                </label>
+                <span key={c.id} className="tipo-mantencion-checks__item">
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={mantencionForm.configuracionIds.includes(c.id)}
+                      onChange={() => toggleTipoMantencion(c.id)}
+                    />
+                    {c.tipo}
+                  </label>
+                  <button
+                    type="button"
+                    className="icon-button icon-button--small"
+                    title="Renombrar"
+                    aria-label="Renombrar"
+                    onClick={() => handleRenombrarConfiguracion(c)}
+                  >
+                    <IconEditar />
+                  </button>
+                </span>
               ))}
               <button
                 type="button"

@@ -7,6 +7,7 @@ export interface JwtPayload {
   personaId: string;
   rol: RolUsuario;
   nombreCompleto: string;
+  esSuperAdmin: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {

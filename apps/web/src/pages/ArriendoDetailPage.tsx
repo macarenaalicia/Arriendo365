@@ -12,15 +12,26 @@ import type {
   Persona,
   Requerimiento,
   TipoProveedor,
-  TipoReparacion,
   UrgenciaRequerimiento,
 } from '../api/types';
 import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy, isoToDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
-import { IconCheck, IconEditar, IconEliminar, IconReloj, IconRechazar } from '../components/icons';
+import {
+  IconCheck,
+  IconDescargar,
+  IconEditar,
+  IconEliminar,
+  IconReloj,
+  IconRechazar,
+} from '../components/icons';
 import { eliminarDocumento, listarDocumentos, subirDocumento } from '../lib/documentos';
+import { subirFoto } from '../lib/fotos';
+import { descargarArchivo } from '../lib/descargas';
+import { useCalificaciones } from '../lib/useCalificaciones';
+import { CalificacionSelect } from '../components/CalificacionSelect';
+import { TecnicoSelect } from '../components/TecnicoSelect';
 import {
   HistorialRequerimientoBoton,
   HistorialRequerimientoFilas,
@@ -38,7 +49,7 @@ import {
 
 const ESTADOS_PAGO: EstadoPago[] = ['PENDIENTE', 'PAGADO', 'ATRASADO', 'RECHAZADO'];
 const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
-const TIPOS_REPARACION: TipoReparacion[] = ['LOCATIVA', 'ESTRUCTURAL'];
+const MAX_FOTOS_REQUERIMIENTO = 10;
 const ESTADOS_REQUERIMIENTO: EstadoRequerimiento[] = [
   'PENDIENTE_REVISION',
   'REVISION_AGENDADA',
@@ -78,6 +89,7 @@ const CONDICIONES_FORM_INICIAL = {
   fechaPago: '',
   fechaEntrega: '',
   periodoAlza: 'ANUAL' as (typeof PERIODOS_ALZA)[number],
+  ipcPorcentaje: '',
 };
 
 const DOCUMENTO_TIPOS_ARRIENDO = [
@@ -97,12 +109,15 @@ const DOCUMENTO_FORM_INICIAL = {
 
 const REQ_FORM_INICIAL = {
   urgencia: 'MEDIA' as UrgenciaRequerimiento,
-  tipoReparacion: 'LOCATIVA' as TipoReparacion,
+  calificacionId: '',
   notasArrendatario: '',
   estado: 'PENDIENTE_REVISION' as EstadoRequerimiento,
   tecnicoId: '',
   notasInternas: '',
   detalleResolucion: '',
+  inspeccion: '',
+  detalleGasto: '',
+  totalGasto: '',
 };
 
 export function ArriendoDetailPage() {
@@ -111,6 +126,8 @@ export function ArriendoDetailPage() {
   const { hash } = useLocation();
   const { rol } = useAuth();
   const esStaff = rol !== 'ARRENDATARIO';
+  const esPropietarioOAdmin = rol === 'ADMINISTRADOR' || rol === 'PROPIETARIO';
+  const esPropietario = rol === 'PROPIETARIO';
 
   const [arriendo, setArriendo] = useState<ArriendoPropiedad | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -132,12 +149,14 @@ export function ArriendoDetailPage() {
 
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const { calificaciones, recargarCalificaciones } = useCalificaciones();
   const [showReqForm, setShowReqForm] = useState(false);
   const [editingReqId, setEditingReqId] = useState<string | null>(null);
   const [reqForm, setReqForm] = useState(REQ_FORM_INICIAL);
   const [reqError, setReqError] = useState<string | null>(null);
   const [savingReq, setSavingReq] = useState(false);
   const [historialAbiertoId, setHistorialAbiertoId] = useState<string | null>(null);
+  const [descargandoReqId, setDescargandoReqId] = useState<string | null>(null);
 
   const [showCondicionesForm, setShowCondicionesForm] = useState(false);
   const [condicionesForm, setCondicionesForm] = useState(CONDICIONES_FORM_INICIAL);
@@ -272,6 +291,7 @@ export function ArriendoDetailPage() {
       fechaPago: String(arriendo.fechaPago),
       fechaEntrega: isoToDdmmyyyy(arriendo.fechaEntrega),
       periodoAlza: arriendo.periodoAlza as (typeof PERIODOS_ALZA)[number],
+      ipcPorcentaje: arriendo.ipcPorcentaje ?? '',
     });
     setCondicionesError(null);
     setShowCondicionesForm(true);
@@ -295,6 +315,7 @@ export function ArriendoDetailPage() {
         fechaPago: Number(condicionesForm.fechaPago),
         fechaEntrega,
         periodoAlza: condicionesForm.periodoAlza,
+        ipcPorcentaje: condicionesForm.ipcPorcentaje ? Number(condicionesForm.ipcPorcentaje) : undefined,
       });
       cerrarCondicionesForm();
       cargarArriendo();
@@ -313,6 +334,32 @@ export function ArriendoDetailPage() {
     navigate('/');
   };
   const eliminarArriendoConfirmar = useConfirmarEliminar<true>(handleDeleteArriendo);
+
+  const [aplicandoReajuste, setAplicandoReajuste] = useState(false);
+  const [descargandoContrato, setDescargandoContrato] = useState(false);
+
+  const handleAplicarReajuste = async () => {
+    if (!id) return;
+    setAplicandoReajuste(true);
+    try {
+      await api.post(`/arriendos-propiedad/${id}/aplicar-reajuste-ipc`);
+      cargarArriendo();
+    } catch (err) {
+      setCondicionesError(err instanceof ApiError ? err.message : 'No se pudo aplicar el reajuste');
+    } finally {
+      setAplicandoReajuste(false);
+    }
+  };
+
+  const handleDescargarContrato = async () => {
+    if (!id) return;
+    setDescargandoContrato(true);
+    try {
+      await descargarArchivo(`/arriendos-propiedad/${id}/contrato.pdf`, `contrato-${id}.pdf`);
+    } finally {
+      setDescargandoContrato(false);
+    }
+  };
 
   useEffect(() => {
     if (esStaff) {
@@ -456,28 +503,57 @@ export function ArriendoDetailPage() {
     cargarPagos();
   };
 
+  const [archivosPendientesReq, setArchivosPendientesReq] = useState<File[]>([]);
+  const [arrastrandoFotoReq, setArrastrandoFotoReq] = useState(false);
+
+  const agregarArchivosReq = (lista: FileList | null) => {
+    const nuevos = Array.from(lista ?? []).filter((archivo) => archivo.type.startsWith('image/'));
+    if (nuevos.length === 0) return;
+    setArchivosPendientesReq((prev) => [...prev, ...nuevos].slice(0, MAX_FOTOS_REQUERIMIENTO));
+  };
+
+  const agregarArchivosPendientesReq = (event: React.ChangeEvent<HTMLInputElement>) => {
+    agregarArchivosReq(event.target.files);
+    event.target.value = '';
+  };
+
+  const handleDropFotosReq = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setArrastrandoFotoReq(false);
+    agregarArchivosReq(event.dataTransfer.files);
+  };
+
+  const quitarArchivoPendienteReq = (index: number) => {
+    setArchivosPendientesReq((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const cerrarReqForm = () => {
     setShowReqForm(false);
     setEditingReqId(null);
     setReqForm(REQ_FORM_INICIAL);
     setReqError(null);
+    setArchivosPendientesReq([]);
   };
 
   const abrirCreacionReq = () => {
     setReqForm(REQ_FORM_INICIAL);
     setEditingReqId(null);
+    setArchivosPendientesReq([]);
     setShowReqForm(true);
   };
 
   const abrirEdicionReq = (req: Requerimiento) => {
     setReqForm({
       urgencia: req.urgencia,
-      tipoReparacion: req.tipoReparacion,
+      calificacionId: req.calificacionId,
       notasArrendatario: req.notasArrendatario ?? '',
       estado: req.estado,
       tecnicoId: req.tecnicoId ?? '',
       notasInternas: req.notasInternas ?? '',
       detalleResolucion: req.detalleResolucion ?? '',
+      inspeccion: req.inspeccion ?? '',
+      detalleGasto: req.detalleGasto ?? '',
+      totalGasto: req.totalGasto ?? '',
     });
     setEditingReqId(req.id);
     setShowReqForm(true);
@@ -491,20 +567,30 @@ export function ArriendoDetailPage() {
       if (editingReqId) {
         await api.patch(`/requerimientos/${editingReqId}`, {
           urgencia: reqForm.urgencia,
-          tipoReparacion: reqForm.tipoReparacion,
+          calificacionId: reqForm.calificacionId,
           notasArrendatario: reqForm.notasArrendatario || undefined,
           estado: reqForm.estado,
           tecnicoId: reqForm.tecnicoId || undefined,
           notasInternas: reqForm.notasInternas || undefined,
           detalleResolucion: reqForm.detalleResolucion || undefined,
+          inspeccion: esPropietarioOAdmin ? reqForm.inspeccion || undefined : undefined,
+          detalleGasto: esPropietario ? reqForm.detalleGasto || undefined : undefined,
+          totalGasto: esPropietario && reqForm.totalGasto ? Number(reqForm.totalGasto) : undefined,
         });
       } else {
-        await api.post('/requerimientos', {
+        const creado = await api.post<Requerimiento>('/requerimientos', {
           arriendoPropiedadId: id,
           urgencia: reqForm.urgencia,
-          tipoReparacion: reqForm.tipoReparacion,
+          calificacionId: reqForm.calificacionId,
           notasArrendatario: reqForm.notasArrendatario || undefined,
+          inspeccion: esPropietarioOAdmin ? reqForm.inspeccion || undefined : undefined,
+          detalleGasto: esPropietario ? reqForm.detalleGasto || undefined : undefined,
+          totalGasto: esPropietario && reqForm.totalGasto ? Number(reqForm.totalGasto) : undefined,
         });
+
+        for (const archivo of archivosPendientesReq) {
+          await subirFoto(archivo, 'requerimiento', creado.id);
+        }
       }
 
       cerrarReqForm();
@@ -534,6 +620,15 @@ export function ArriendoDetailPage() {
   const handleReabrirReq = async (reqId: string) => {
     await api.patch(`/requerimientos/${reqId}`, { estado: 'REABIERTO' });
     cargarRequerimientos();
+  };
+
+  const handleDescargarReq = async (reqId: string) => {
+    setDescargandoReqId(reqId);
+    try {
+      await descargarArchivo(`/requerimientos/${reqId}/descarga.pdf`, `requerimiento-${reqId}.pdf`);
+    } finally {
+      setDescargandoReqId(null);
+    }
   };
 
   if (loading) return <p>Cargando…</p>;
@@ -666,7 +761,19 @@ export function ArriendoDetailPage() {
         <h1>
           {arriendo.propiedad.calle} {arriendo.propiedad.numero}
         </h1>
-        <span className={`badge badge--${arriendo.estado.toLowerCase()}`}>{arriendo.estado}</span>
+        <div className="page-header__actions">
+          <button
+            type="button"
+            className="icon-button"
+            title="Descargar contrato"
+            aria-label="Descargar contrato"
+            disabled={descargandoContrato}
+            onClick={handleDescargarContrato}
+          >
+            <IconDescargar />
+          </button>
+          <span className={`badge badge--${arriendo.estado.toLowerCase()}`}>{arriendo.estado}</span>
+        </div>
       </div>
 
       <section className="detail-grid">
@@ -709,10 +816,28 @@ export function ArriendoDetailPage() {
           <p>Día de pago: {arriendo.fechaPago}</p>
           <p>Entrega: {formatFecha(arriendo.fechaEntrega)}</p>
           <p>Reajuste: {arriendo.periodoAlza}</p>
+          {arriendo.ipcPorcentaje !== null && <p>% IPC pactado: {arriendo.ipcPorcentaje}%</p>}
+          {arriendo.proximaFechaAlza && arriendo.montoProyectadoAlza !== null && (
+            <p>
+              Próximo reajuste: {formatFecha(arriendo.proximaFechaAlza)} → {formatMonto(String(arriendo.montoProyectadoAlza))}
+            </p>
+          )}
           {esStaff && (
-            <button type="button" className="link-button" onClick={abrirEdicionCondiciones}>
-              Editar condiciones
-            </button>
+            <div className="table__actions">
+              <button type="button" className="link-button" onClick={abrirEdicionCondiciones}>
+                Editar condiciones
+              </button>
+              {arriendo.ipcPorcentaje !== null && arriendo.montoProyectadoAlza !== null && (
+                <button
+                  type="button"
+                  className="link-button"
+                  disabled={aplicandoReajuste}
+                  onClick={handleAplicarReajuste}
+                >
+                  {aplicandoReajuste ? 'Aplicando…' : 'Aplicar reajuste ahora'}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </section>
@@ -773,6 +898,19 @@ export function ArriendoDetailPage() {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label>
+                % IPC pactado (opcional)
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={condicionesForm.ipcPorcentaje}
+                  onChange={(e) =>
+                    setCondicionesForm({ ...condicionesForm, ipcPorcentaje: e.target.value })
+                  }
+                />
               </label>
             </div>
 
@@ -1114,19 +1252,14 @@ export function ArriendoDetailPage() {
                 </select>
               </label>
               <label>
-                Tipo de reparación
-                <select
-                  value={reqForm.tipoReparacion}
-                  onChange={(e) =>
-                    setReqForm({ ...reqForm, tipoReparacion: e.target.value as TipoReparacion })
-                  }
-                >
-                  {TIPOS_REPARACION.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                Calificación
+                <CalificacionSelect
+                  calificaciones={calificaciones}
+                  value={reqForm.calificacionId}
+                  onChange={(calificacionId) => setReqForm({ ...reqForm, calificacionId })}
+                  permitirCrear={esStaff}
+                  onCalificacionCreada={() => recargarCalificaciones()}
+                />
               </label>
               {editingReqId && esStaff && (
                 <>
@@ -1143,30 +1276,73 @@ export function ArriendoDetailPage() {
                     >
                       {ESTADOS_REQUERIMIENTO.map((estado) => (
                         <option key={estado} value={estado}>
-                          {estado}
+                          {estado.replace(/_/g, ' ')}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label>
                     Técnico asignado
-                    <select
+                    <TecnicoSelect
+                      personas={personas}
                       value={reqForm.tecnicoId}
-                      onChange={(e) => setReqForm({ ...reqForm, tecnicoId: e.target.value })}
-                    >
-                      <option value="">Sin asignar</option>
-                      {personas
-                        .filter((p) => p.tipoPersona === 'TECNICO' || p.id === reqForm.tecnicoId)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombreCompleto}
-                          </option>
-                        ))}
-                    </select>
+                      onChange={(tecnicoId) => setReqForm({ ...reqForm, tecnicoId })}
+                      onPersonaCreada={(persona) => setPersonas((prev) => [...prev, persona])}
+                    />
                   </label>
                 </>
               )}
             </div>
+
+            {!editingReqId && (
+              <>
+                {archivosPendientesReq.length < MAX_FOTOS_REQUERIMIENTO ? (
+                  <div
+                    className={`inline-form__fotos${arrastrandoFotoReq ? ' inline-form__fotos--arrastrando' : ''}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setArrastrandoFotoReq(true);
+                    }}
+                    onDragLeave={() => setArrastrandoFotoReq(false)}
+                    onDrop={handleDropFotosReq}
+                  >
+                    <span>
+                      Fotos (opcional, máx. {MAX_FOTOS_REQUERIMIENTO}) — elige un archivo o
+                      arrástralo aquí
+                    </span>
+                    <label className="button-like">
+                      + Elegir fotos
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        hidden
+                        onChange={agregarArchivosPendientesReq}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <p className="empty-state">Máximo {MAX_FOTOS_REQUERIMIENTO} fotos alcanzado.</p>
+                )}
+
+                {archivosPendientesReq.length > 0 && (
+                  <div className="fotos-grid">
+                    {archivosPendientesReq.map((archivo, index) => (
+                      <div key={`${archivo.name}-${index}`} className="fotos-grid__item">
+                        <span>{archivo.name}</span>
+                        <button
+                          type="button"
+                          className="danger danger--small"
+                          onClick={() => quitarArchivoPendienteReq(index)}
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
             {editingReqId && esStaff && (
               <label>
@@ -1200,6 +1376,37 @@ export function ArriendoDetailPage() {
               </label>
             )}
 
+            {esPropietarioOAdmin && (
+              <label>
+                Inspección
+                <textarea
+                  value={reqForm.inspeccion}
+                  onChange={(e) => setReqForm({ ...reqForm, inspeccion: e.target.value })}
+                />
+              </label>
+            )}
+            {esPropietario && (
+              <>
+                <label>
+                  Detalle gasto
+                  <textarea
+                    rows={5}
+                    value={reqForm.detalleGasto}
+                    onChange={(e) => setReqForm({ ...reqForm, detalleGasto: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Total gasto
+                  <input
+                    type="number"
+                    min={0}
+                    value={reqForm.totalGasto}
+                    onChange={(e) => setReqForm({ ...reqForm, totalGasto: e.target.value })}
+                  />
+                </label>
+              </>
+            )}
+
             {reqError && <p className="auth-card__error">{reqError}</p>}
 
             <button type="submit" disabled={savingReq}>
@@ -1218,11 +1425,12 @@ export function ArriendoDetailPage() {
               <thead>
                 <tr>
                   <th style={{ width: '90px' }}>Urgencia</th>
-                  <th style={{ width: '100px' }}>Tipo</th>
+                  <th style={{ width: '120px' }}>Calificación</th>
                   <th style={{ width: '130px' }}>Estado</th>
                   <th style={{ width: '150px' }}>Técnico</th>
                   <th>Descripción</th>
                   <th style={{ width: '120px' }}>{esStaff ? 'Acciones' : 'Historial'}</th>
+                  <th style={{ width: '60px' }}>Descargar</th>
                 </tr>
               </thead>
               <tbody>
@@ -1236,11 +1444,7 @@ export function ArriendoDetailPage() {
                             {req.urgencia}
                           </span>
                         </td>
-                        <td>
-                          <span className={`badge badge--${req.tipoReparacion.toLowerCase()}`}>
-                            {req.tipoReparacion}
-                          </span>
-                        </td>
+                        <td>{req.calificacion.nombre}</td>
                         <td className="table__cell-wrap">
                           <span className={`badge badge--${req.estado.toLowerCase()}`}>
                             {req.estado.replace(/_/g, ' ')}
@@ -1286,9 +1490,21 @@ export function ArriendoDetailPage() {
                             />
                           </div>
                         </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            title="Descargar"
+                            aria-label="Descargar"
+                            disabled={descargandoReqId === req.id}
+                            onClick={() => handleDescargarReq(req.id)}
+                          >
+                            <IconDescargar />
+                          </button>
+                        </td>
                       </tr>
                       {historialAbierto && (
-                        <HistorialRequerimientoFilas actualizaciones={req.actualizaciones} colSpan={6} />
+                        <HistorialRequerimientoFilas actualizaciones={req.actualizaciones} colSpan={7} />
                       )}
                     </Fragment>
                   );

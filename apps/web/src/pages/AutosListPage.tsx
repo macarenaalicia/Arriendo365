@@ -5,7 +5,9 @@ import type { Auto, EstadoAuto } from '../api/types';
 import { formatEnumLabel } from '../lib/format';
 import { Modal } from '../components/Modal';
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
-import { IconEliminar } from '../components/icons';
+import { IconEditar, IconEliminar } from '../components/icons';
+import { OnboardingTour } from '../components/OnboardingTour';
+import { useOnboardingTour } from '../lib/useOnboardingTour';
 
 const ESTADOS: EstadoAuto[] = ['DISPONIBLE', 'ARRENDADO', 'EN_MANTENCION'];
 
@@ -13,10 +15,26 @@ const FORM_INICIAL = { patente: '', marca: '', modelo: '', anio: '', kilometraje
 
 type CampoOrdenable = 'patente' | 'marca' | 'modelo' | 'anio' | 'kilometraje' | 'estado';
 
+const AUTOS_TOUR_STEPS = [
+  {
+    target: 'autos-nuevo',
+    titulo: 'Agrega tus autos',
+    texto: 'Registra un auto con su patente, marca, modelo y kilometraje.',
+  },
+  {
+    target: 'autos-tabla',
+    titulo: 'Tu listado de autos',
+    texto:
+      'Haz clic en la patente para ver el detalle del auto (mantenciones, pagos, arriendos). Usa los íconos para editar o eliminar.',
+  },
+];
+
 export function AutosListPage() {
   const [autos, setAutos] = useState<Auto[]>([]);
   const [loading, setLoading] = useState(true);
+  const tour = useOnboardingTour('autos');
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM_INICIAL);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -99,12 +117,26 @@ export function AutosListPage() {
 
   const cerrarForm = () => {
     setShowForm(false);
+    setEditingId(null);
     setForm(FORM_INICIAL);
     setError(null);
   };
 
   const abrirCreacion = () => {
     setForm(FORM_INICIAL);
+    setEditingId(null);
+    setShowForm(true);
+  };
+
+  const abrirEdicion = (auto: Auto) => {
+    setForm({
+      patente: auto.patente,
+      marca: auto.marca ?? '',
+      modelo: auto.modelo ?? '',
+      anio: auto.anio ? String(auto.anio) : '',
+      kilometraje: String(auto.kilometraje),
+    });
+    setEditingId(auto.id);
     setShowForm(true);
   };
 
@@ -113,13 +145,18 @@ export function AutosListPage() {
     setError(null);
     setSaving(true);
     try {
-      await api.post('/autos', {
+      const payload = {
         patente: form.patente.toUpperCase(),
         marca: form.marca || undefined,
         modelo: form.modelo || undefined,
         anio: form.anio ? Number(form.anio) : undefined,
         kilometraje: Number(form.kilometraje),
-      });
+      };
+      if (editingId) {
+        await api.patch(`/autos/${editingId}`, payload);
+      } else {
+        await api.post('/autos', payload);
+      }
       cerrarForm();
       cargar();
     } catch (err) {
@@ -144,13 +181,13 @@ export function AutosListPage() {
     <div>
       <div className="page-header">
         <h1>Autos</h1>
-        <button type="button" onClick={abrirCreacion}>
+        <button type="button" data-tour="autos-nuevo" onClick={abrirCreacion}>
           + Nuevo auto
         </button>
       </div>
 
       {showForm && (
-        <Modal titulo="Nuevo auto" onClose={cerrarForm}>
+        <Modal titulo={editingId ? 'Editar auto' : 'Nuevo auto'} onClose={cerrarForm}>
         <form className="inline-form" onSubmit={handleSubmit}>
           <div className="inline-form__grid">
             <label>
@@ -200,7 +237,7 @@ export function AutosListPage() {
           {error && <p className="auth-card__error">{error}</p>}
 
           <button type="submit" disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar auto'}
+            {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Guardar auto'}
           </button>
         </form>
         </Modal>
@@ -211,7 +248,7 @@ export function AutosListPage() {
       {!loading && autos.length === 0 && <p className="empty-state">Aún no has agregado autos.</p>}
 
       {!loading && autos.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap" data-tour="autos-tabla">
           <table className="table">
             <thead>
               <tr>
@@ -280,6 +317,15 @@ export function AutosListPage() {
                     <div className="table__actions">
                       <button
                         type="button"
+                        className="icon-button"
+                        title="Editar"
+                        aria-label="Editar"
+                        onClick={() => abrirEdicion(auto)}
+                      >
+                        <IconEditar />
+                      </button>
+                      <button
+                        type="button"
                         className="icon-button icon-button--danger"
                         title="Eliminar"
                         aria-label="Eliminar"
@@ -296,6 +342,7 @@ export function AutosListPage() {
         </div>
       )}
       {eliminarAuto.modal}
+      {tour.activo && !loading && <OnboardingTour steps={AUTOS_TOUR_STEPS} onCerrar={tour.cerrar} />}
     </div>
   );
 }

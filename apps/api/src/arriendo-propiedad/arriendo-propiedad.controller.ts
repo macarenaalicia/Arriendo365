@@ -9,7 +9,9 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { RolUsuario } from '@prisma/client';
 import { ArriendoPropiedadService } from './arriendo-propiedad.service';
 import { CreateArriendoPropiedadDto } from './dto/create-arriendo-propiedad.dto';
@@ -48,5 +50,21 @@ export class ArriendoPropiedadController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
     return this.arriendoPropiedadService.remove(id);
+  }
+
+  @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO)
+  @Post(':id/aplicar-reajuste-ipc')
+  aplicarReajusteIpc(@Param('id') id: string) {
+    return this.arriendoPropiedadService.aplicarReajusteIpc(id);
+  }
+
+  @Get(':id/contrato.pdf')
+  async descargarContrato(@Param('id') id: string, @Res() res: Response) {
+    const pdf = await this.arriendoPropiedadService.generarContratoPdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="contrato-${id}.pdf"`,
+    });
+    res.send(pdf);
   }
 }

@@ -7,14 +7,17 @@ import type {
   Foto,
   Persona,
   Requerimiento,
-  TipoReparacion,
   UrgenciaRequerimiento,
 } from '../api/types';
 import { formatFechaHora } from '../lib/format';
 import { listarFotos } from '../lib/fotos';
+import { useCalificaciones } from '../lib/useCalificaciones';
+import { descargarArchivo } from '../lib/descargas';
+import { CalificacionSelect } from '../components/CalificacionSelect';
+import { TecnicoSelect } from '../components/TecnicoSelect';
+import { IconDescargar } from '../components/icons';
 
 const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
-const TIPOS_REPARACION: TipoReparacion[] = ['LOCATIVA', 'ESTRUCTURAL'];
 const ESTADOS_REQUERIMIENTO: EstadoRequerimiento[] = [
   'PENDIENTE_REVISION',
   'REVISION_AGENDADA',
@@ -28,21 +31,28 @@ export function RequerimientoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { rol } = useAuth();
   const esStaff = rol === 'ADMINISTRADOR' || rol === 'PROPIETARIO' || rol === 'TECNICO';
+  const esPropietarioOAdmin = rol === 'ADMINISTRADOR' || rol === 'PROPIETARIO';
+  const esPropietario = rol === 'PROPIETARIO';
 
   const [requerimiento, setRequerimiento] = useState<Requerimiento | null>(null);
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const { calificaciones, recargarCalificaciones } = useCalificaciones();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState(false);
 
   const [editando, setEditando] = useState(false);
   const [form, setForm] = useState({
     urgencia: 'MEDIA' as UrgenciaRequerimiento,
-    tipoReparacion: 'LOCATIVA' as TipoReparacion,
+    calificacionId: '',
     estado: 'PENDIENTE_REVISION' as EstadoRequerimiento,
     tecnicoId: '',
     notasInternas: '',
     detalleResolucion: '',
+    inspeccion: '',
+    detalleGasto: '',
+    totalGasto: '',
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,11 +80,14 @@ export function RequerimientoDetailPage() {
     if (!requerimiento) return;
     setForm({
       urgencia: requerimiento.urgencia,
-      tipoReparacion: requerimiento.tipoReparacion,
+      calificacionId: requerimiento.calificacionId,
       estado: requerimiento.estado,
       tecnicoId: requerimiento.tecnicoId ?? '',
       notasInternas: requerimiento.notasInternas ?? '',
       detalleResolucion: requerimiento.detalleResolucion ?? '',
+      inspeccion: requerimiento.inspeccion ?? '',
+      detalleGasto: requerimiento.detalleGasto ?? '',
+      totalGasto: requerimiento.totalGasto ?? '',
     });
     setFormError(null);
     setEditando(true);
@@ -88,11 +101,14 @@ export function RequerimientoDetailPage() {
     try {
       const actualizado = await api.patch<Requerimiento>(`/requerimientos/${id}`, {
         urgencia: form.urgencia,
-        tipoReparacion: form.tipoReparacion,
+        calificacionId: form.calificacionId,
         estado: form.estado,
         tecnicoId: form.tecnicoId || undefined,
         notasInternas: form.notasInternas || undefined,
         detalleResolucion: form.detalleResolucion || undefined,
+        inspeccion: esPropietarioOAdmin ? form.inspeccion || undefined : undefined,
+        detalleGasto: esPropietario ? form.detalleGasto || undefined : undefined,
+        totalGasto: esPropietario && form.totalGasto ? Number(form.totalGasto) : undefined,
       });
       setRequerimiento(actualizado);
       setEditando(false);
@@ -100,6 +116,16 @@ export function RequerimientoDetailPage() {
       setFormError(err instanceof ApiError ? err.message : 'No se pudo guardar');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDescargar = async () => {
+    if (!id) return;
+    setDescargando(true);
+    try {
+      await descargarArchivo(`/requerimientos/${id}/descarga.pdf`, `requerimiento-${id}.pdf`);
+    } finally {
+      setDescargando(false);
     }
   };
 
@@ -116,6 +142,16 @@ export function RequerimientoDetailPage() {
         </h1>
         <div className="page-header__actions">
           <Link to={`/arriendos/${requerimiento.arriendoPropiedadId}`}>Ver arriendo</Link>
+          <button
+            type="button"
+            className="icon-button"
+            title="Descargar"
+            aria-label="Descargar"
+            disabled={descargando}
+            onClick={handleDescargar}
+          >
+            <IconDescargar />
+          </button>
           {esStaff && !editando && (
             <button type="button" onClick={abrirEdicion}>
               Editar
@@ -133,10 +169,8 @@ export function RequerimientoDetailPage() {
             </span>
           </div>
           <div className="detail-card__item">
-            <span className="detail-card__label">Tipo</span>
-            <span className={`badge badge--${requerimiento.tipoReparacion.toLowerCase()}`}>
-              {requerimiento.tipoReparacion}
-            </span>
+            <span className="detail-card__label">Calificación</span>
+            <span className="detail-card__value">{requerimiento.calificacion.nombre}</span>
           </div>
           <div className="detail-card__item">
             <span className="detail-card__label">Estado</span>
@@ -164,6 +198,26 @@ export function RequerimientoDetailPage() {
             <span className="detail-card__label">Detalle de resolución</span>
             <span className="detail-card__value">{requerimiento.detalleResolucion || '—'}</span>
           </div>
+          {esPropietarioOAdmin && (
+            <div className="detail-card__item">
+              <span className="detail-card__label">Inspección</span>
+              <span className="detail-card__value">{requerimiento.inspeccion || '—'}</span>
+            </div>
+          )}
+          {esPropietario && (requerimiento.detalleGasto || requerimiento.totalGasto) && (
+            <>
+              <div className="detail-card__item">
+                <span className="detail-card__label">Detalle gasto</span>
+                <span className="detail-card__value">{requerimiento.detalleGasto || '—'}</span>
+              </div>
+              <div className="detail-card__item">
+                <span className="detail-card__label">Total gasto</span>
+                <span className="detail-card__value">
+                  {requerimiento.totalGasto ? `$${Number(requerimiento.totalGasto).toLocaleString('es-CL')}` : '—'}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -186,19 +240,14 @@ export function RequerimientoDetailPage() {
                 </select>
               </label>
               <label>
-                Tipo de reparación
-                <select
-                  value={form.tipoReparacion}
-                  onChange={(e) =>
-                    setForm({ ...form, tipoReparacion: e.target.value as TipoReparacion })
-                  }
-                >
-                  {TIPOS_REPARACION.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                Calificación
+                <CalificacionSelect
+                  calificaciones={calificaciones}
+                  value={form.calificacionId}
+                  onChange={(calificacionId) => setForm({ ...form, calificacionId })}
+                  permitirCrear
+                  onCalificacionCreada={() => recargarCalificaciones()}
+                />
               </label>
               <label>
                 Estado
@@ -215,19 +264,12 @@ export function RequerimientoDetailPage() {
               </label>
               <label>
                 Técnico asignado
-                <select
+                <TecnicoSelect
+                  personas={personas}
                   value={form.tecnicoId}
-                  onChange={(e) => setForm({ ...form, tecnicoId: e.target.value })}
-                >
-                  <option value="">Sin asignar</option>
-                  {personas
-                    .filter((p) => p.tipoPersona === 'TECNICO' || p.id === form.tecnicoId)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombreCompleto}
-                      </option>
-                    ))}
-                </select>
+                  onChange={(tecnicoId) => setForm({ ...form, tecnicoId })}
+                  onPersonaCreada={(persona) => setPersonas((prev) => [...prev, persona])}
+                />
               </label>
             </div>
 
@@ -247,6 +289,37 @@ export function RequerimientoDetailPage() {
                   onChange={(e) => setForm({ ...form, detalleResolucion: e.target.value })}
                 />
               </label>
+            )}
+
+            {esPropietarioOAdmin && (
+              <label>
+                Inspección
+                <textarea
+                  value={form.inspeccion}
+                  onChange={(e) => setForm({ ...form, inspeccion: e.target.value })}
+                />
+              </label>
+            )}
+            {esPropietario && (
+              <>
+                <label>
+                  Detalle gasto
+                  <textarea
+                    rows={5}
+                    value={form.detalleGasto}
+                    onChange={(e) => setForm({ ...form, detalleGasto: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Total gasto
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.totalGasto}
+                    onChange={(e) => setForm({ ...form, totalGasto: e.target.value })}
+                  />
+                </label>
+              </>
             )}
 
             {formError && <p className="auth-card__error">{formError}</p>}
@@ -287,7 +360,7 @@ export function RequerimientoDetailPage() {
                 <tr>
                   <th>Fecha</th>
                   <th>Urgencia</th>
-                  <th>Tipo</th>
+                  <th>Calificación</th>
                   <th>Estado</th>
                   <th>Técnico</th>
                   <th>Descripción</th>
@@ -301,11 +374,7 @@ export function RequerimientoDetailPage() {
                     <td>
                       <span className={`badge badge--${a.urgencia.toLowerCase()}`}>{a.urgencia}</span>
                     </td>
-                    <td>
-                      <span className={`badge badge--${a.tipoReparacion.toLowerCase()}`}>
-                        {a.tipoReparacion}
-                      </span>
-                    </td>
+                    <td>{a.calificacion.nombre}</td>
                     <td>
                       <span className={`badge badge--${a.estado.toLowerCase()}`}>
                         {a.estado.replace(/_/g, ' ')}

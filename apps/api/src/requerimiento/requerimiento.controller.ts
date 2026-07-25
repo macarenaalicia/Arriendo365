@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { RolUsuario } from '@prisma/client';
 import { RequerimientoService } from './requerimiento.service';
 import { CreateRequerimientoDto } from './dto/create-requerimiento.dto';
@@ -22,7 +23,17 @@ export class RequerimientoController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.requerimientoService.findOne(id);
+    return this.requerimientoService.obtenerParaMostrar(id);
+  }
+
+  @Get(':id/descarga.pdf')
+  async descargar(@Param('id') id: string, @Res() res: Response) {
+    const pdf = await this.requerimientoService.generarPdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="requerimiento-${id}.pdf"`,
+    });
+    res.send(pdf);
   }
 
   @Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO, RolUsuario.TECNICO)

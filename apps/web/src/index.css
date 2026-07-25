@@ -578,6 +578,10 @@ section + section {
   color: var(--color-text);
 }
 
+.proveedores-panel__detalle {
+  padding-left: 0.75rem;
+}
+
 .proveedores-panel__row-actions {
   display: flex;
   gap: 0.4rem;
@@ -822,6 +826,12 @@ section + section {
   gap: 1rem;
   flex-wrap: wrap;
   font-size: 0.85rem;
+}
+
+.tipo-mantencion-checks__item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .inline-form button,
@@ -1974,4 +1984,56 @@ section + section {
   .public-gallery img {
     height: 160px;
   }
+}
+
+.onboarding-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.onboarding-tour__spotlight {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.onboarding-tour__tooltip {
+  position: fixed;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  padding: 1rem;
+  pointer-events: auto;
+}
+
+.onboarding-tour__step {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.onboarding-tour__tooltip h3 {
+  margin: 0 0 0.4rem;
+}
+
+.onboarding-tour__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+
+.onboarding-tour__nav {
+  display: flex;
+  gap: 0.5rem;
 }

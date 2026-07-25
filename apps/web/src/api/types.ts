@@ -1,5 +1,7 @@
 export type RolUsuario = 'ADMINISTRADOR' | 'PROPIETARIO' | 'ARRENDATARIO' | 'TECNICO';
 
+export type PerfilPersona = RolUsuario | 'CODEUDOR';
+
 export type EstadoArriendo = 'ACTIVO' | 'INACTIVO' | 'TERMINADO';
 
 export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ATRASADO' | 'RECHAZADO';
@@ -42,6 +44,9 @@ export interface Propiedad {
   estado: EstadoPropiedad;
   pagaContribuciones: boolean;
   precioArriendoEsperado: string | null;
+  fojasInscripcion: string | null;
+  numeroInscripcion: string | null;
+  anioInscripcion: number | null;
 }
 
 export interface Foto {
@@ -142,8 +147,8 @@ export interface Persona {
   nombreCompleto: string;
   /** Un técnico (tipoPersona TECNICO) no exige RUT, solo nombre completo. */
   rut: string | null;
-  /** Categoriza a la persona (ej. técnico) independiente de si tiene acceso a la plataforma. */
-  tipoPersona: RolUsuario | null;
+  /** Categoriza a la persona (ej. técnico, codeudor) independiente de si tiene acceso a la plataforma. */
+  tipoPersona: PerfilPersona | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -155,6 +160,7 @@ export interface Usuario {
   personaId: string;
   rol: RolUsuario;
   activo: boolean;
+  debeCambiarPassword: boolean;
 }
 
 export interface ConfiguracionMantencion {
@@ -224,6 +230,12 @@ export interface ArriendoPropiedad {
   fechaEntrega: string;
   fechaRecepcion: string | null;
   periodoAlza: string;
+  ipcPorcentaje: string | null;
+  ultimaAlzaFecha: string | null;
+  /** Calculado en el backend, no persistido: próxima fecha en que corresponde aplicar el reajuste. */
+  proximaFechaAlza: string | null;
+  /** Calculado en el backend, no persistido: monto que quedaría tras aplicar el % de IPC pactado. */
+  montoProyectadoAlza: number | null;
   montoArriendo: string;
   estado: EstadoArriendo;
   propiedad: Propiedad;
@@ -270,13 +282,17 @@ export type EstadoRequerimiento =
   | 'RECHAZADO'
   | 'REABIERTO';
 
-export type TipoReparacion = 'ESTRUCTURAL' | 'LOCATIVA';
+export interface CalificacionRequerimiento {
+  id: string;
+  nombre: string;
+}
 
 export interface RequerimientoActualizacion {
   id: string;
   urgencia: UrgenciaRequerimiento;
   estado: EstadoRequerimiento;
-  tipoReparacion: TipoReparacion;
+  calificacionId: string;
+  calificacion: CalificacionRequerimiento;
   tecnico: Persona | null;
   notasArrendatario: string | null;
   detalleResolucion: string | null;
@@ -293,10 +309,15 @@ export interface Requerimiento {
   estado: EstadoRequerimiento;
   tecnicoId: string | null;
   tecnico: Persona | null;
-  tipoReparacion: TipoReparacion;
+  calificacionId: string;
+  calificacion: CalificacionRequerimiento;
   detalleResolucion: string | null;
   notasInternas: string | null;
   notasArrendatario: string | null;
+  /** Visibles/editables solo para propietario/administrador; llegan null para el resto. */
+  inspeccion: string | null;
+  detalleGasto: string | null;
+  totalGasto: string | null;
   fechaComprometida: string | null;
   fechaSolucion: string | null;
   actualizaciones: RequerimientoActualizacion[];

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
 import { CreateAutoDto } from './dto/create-auto.dto';
 import { UpdateAutoDto } from './dto/update-auto.dto';
 
@@ -9,6 +10,7 @@ export class AutoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   async create(dto: CreateAutoDto) {
@@ -24,14 +26,24 @@ export class AutoService {
     });
   }
 
-  findAll() {
+  async findAll() {
+    const { autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
+
     return this.prisma.auto.findMany({
-      where: { organizacionId: this.tenant.organizacionId },
+      where: {
+        organizacionId: this.tenant.organizacionId,
+        ...(autoIds ? { id: { in: autoIds } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findOne(id: string) {
+    const { autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
+    if (autoIds && !autoIds.includes(id)) {
+      throw new NotFoundException('Auto no encontrado');
+    }
+
     const auto = await this.prisma.auto.findFirst({
       where: { id, organizacionId: this.tenant.organizacionId },
       include: { documentos: true },

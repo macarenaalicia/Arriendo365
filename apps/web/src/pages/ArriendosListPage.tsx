@@ -20,6 +20,21 @@ import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { calcularProximaAlza, ESTADO_ALZA_LABELS } from '../lib/alzas';
 import { periodoValorAFecha } from '../lib/periodos';
+import { OnboardingTour } from '../components/OnboardingTour';
+import { useOnboardingTour } from '../lib/useOnboardingTour';
+
+const ARRIENDOS_TOUR_STEPS = [
+  {
+    target: 'arriendos-nuevo-propiedad',
+    titulo: 'Crea un arriendo',
+    texto: 'Aquí puedes arrendar una propiedad disponible a un arrendatario.',
+  },
+  {
+    target: 'arriendos-tabla-propiedades',
+    titulo: 'Tus arriendos activos',
+    texto: 'Cada fila es un arriendo. Haz clic en la propiedad para ver el detalle, pagos y condiciones.',
+  },
+];
 
 const REQUERIMIENTO_ESTADOS_ABIERTOS = [
   'PENDIENTE_REVISION',
@@ -100,6 +115,7 @@ const FORM_INICIAL = {
   fechaPago: '',
   fechaEntrega: '',
   periodoAlza: 'ANUAL',
+  ipcPorcentaje: '',
   montoArriendo: '',
   garantia: false,
   garantiaMontoPactado: '',
@@ -125,6 +141,7 @@ export function ArriendosListPage() {
   const [arriendos, setArriendos] = useState<ArriendoPropiedad[]>([]);
   const [estado, setEstado] = useState<EstadoArriendo | ''>('ACTIVO');
   const [loading, setLoading] = useState(true);
+  const tour = useOnboardingTour('arriendos');
   const [error, setError] = useState<string | null>(null);
 
   const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
@@ -206,6 +223,7 @@ export function ArriendosListPage() {
         fechaPago: Number(form.fechaPago),
         fechaEntrega,
         periodoAlza: form.periodoAlza,
+        ipcPorcentaje: form.ipcPorcentaje ? Number(form.ipcPorcentaje) : undefined,
         montoArriendo: Number(form.montoArriendo),
         garantia: form.garantia,
         garantiaMontoPactado: form.garantia && form.garantiaMontoPactado
@@ -319,12 +337,14 @@ export function ArriendosListPage() {
                   onChange={(e) => setAutoForm({ ...autoForm, arrendatarioId: e.target.value })}
                 >
                   <option value="">Elige una persona…</option>
-                  {personas.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombreCompleto}
-                      {p.rut ? ` (${p.rut})` : ''}
-                    </option>
-                  ))}
+                  {personas
+                    .filter((p) => p.tipoPersona === 'ARRENDATARIO')
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombreCompleto}
+                        {p.rut ? ` (${p.rut})` : ''}
+                      </option>
+                    ))}
                 </select>
               </label>
               <label>
@@ -408,11 +428,13 @@ export function ArriendosListPage() {
                 onChange={(e) => setForm({ ...form, propiedadId: e.target.value })}
               >
                 <option value="">Elige una propiedad…</option>
-                {propiedades.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.calle} {p.numero}
-                  </option>
-                ))}
+                {propiedades
+                  .filter((p) => p.estado === 'DISPONIBLE')
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.calle} {p.numero}
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -423,12 +445,14 @@ export function ArriendosListPage() {
                 onChange={(e) => setForm({ ...form, arrendatarioId: e.target.value })}
               >
                 <option value="">Elige una persona…</option>
-                {personas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombreCompleto}
-                    {p.rut ? ` (${p.rut})` : ''}
-                  </option>
-                ))}
+                {personas
+                  .filter((p) => p.tipoPersona === 'ARRENDATARIO')
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombreCompleto}
+                      {p.rut ? ` (${p.rut})` : ''}
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -438,12 +462,14 @@ export function ArriendosListPage() {
                 onChange={(e) => setForm({ ...form, codeudorId: e.target.value })}
               >
                 <option value="">Sin codeudor</option>
-                {personas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombreCompleto}
-                    {p.rut ? ` (${p.rut})` : ''}
-                  </option>
-                ))}
+                {personas
+                  .filter((p) => p.tipoPersona === 'CODEUDOR')
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombreCompleto}
+                      {p.rut ? ` (${p.rut})` : ''}
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -478,6 +504,17 @@ export function ArriendosListPage() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              % IPC pactado (opcional)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={form.ipcPorcentaje}
+                onChange={(e) => setForm({ ...form, ipcPorcentaje: e.target.value })}
+              />
             </label>
             <label>
               Monto arriendo
@@ -607,7 +644,7 @@ export function ArriendosListPage() {
         <div className="page-header">
           <h2>Propiedades</h2>
           {esStaff && (
-            <button type="button" onClick={() => setShowForm(true)}>
+            <button type="button" data-tour="arriendos-nuevo-propiedad" onClick={() => setShowForm(true)}>
               + Nuevo arriendo
             </button>
           )}
@@ -629,7 +666,7 @@ export function ArriendosListPage() {
           </div>
         )}
 
-      <div className="table-wrap">
+      <div className="table-wrap" data-tour="arriendos-tabla-propiedades">
         <table className="table">
           <thead>
             <tr>
@@ -735,6 +772,9 @@ export function ArriendosListPage() {
         </table>
       </div>
       </section>
+      {tour.activo && !loading && (
+        <OnboardingTour steps={ARRIENDOS_TOUR_STEPS} onCerrar={tour.cerrar} />
+      )}
     </div>
   );
 }

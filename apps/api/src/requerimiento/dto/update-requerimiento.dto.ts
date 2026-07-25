@@ -1,11 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import {
-  EstadoRequerimiento,
-  QuienPago,
-  TipoReparacion,
-  UrgenciaRequerimiento,
-} from '@prisma/client';
+import { IsDate, IsEnum, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { EstadoRequerimiento, UrgenciaRequerimiento } from '@prisma/client';
 
 export class UpdateRequerimientoDto {
   @IsOptional()
@@ -21,8 +16,8 @@ export class UpdateRequerimientoDto {
   estado?: EstadoRequerimiento;
 
   @IsOptional()
-  @IsEnum(TipoReparacion)
-  tipoReparacion?: TipoReparacion;
+  @IsUUID()
+  calificacionId?: string;
 
   @IsOptional()
   @IsUUID()
@@ -40,6 +35,19 @@ export class UpdateRequerimientoDto {
   @IsString()
   detalleResolucion?: string;
 
+  // Solo propietario/administrador pueden informar estos campos.
+  @IsOptional()
+  @IsString()
+  inspeccion?: string;
+
+  @IsOptional()
+  @IsString()
+  detalleGasto?: string;
+
+  @IsOptional()
+  @IsNumber()
+  totalGasto?: number;
+
   @IsOptional()
   @Type(() => Date)
   @IsDate()
@@ -49,15 +57,6 @@ export class UpdateRequerimientoDto {
   @Type(() => Date)
   @IsDate()
   fechaSolucion?: Date;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  valorPagado?: number;
-
-  @IsOptional()
-  @IsEnum(QuienPago)
-  quienPago?: QuienPago;
 
   @IsOptional()
   @IsString()

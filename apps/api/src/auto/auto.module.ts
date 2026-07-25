@@ -9,8 +9,10 @@ import { PagoVehiculoService } from './pago-vehiculo/pago-vehiculo.service';
 import { PagoVehiculoController } from './pago-vehiculo/pago-vehiculo.controller';
 import { CobroAutoService } from './cobro-auto/cobro-auto.service';
 import { CobroAutoController } from './cobro-auto/cobro-auto.controller';
+import { AdministradorBienModule } from '../administrador-bien/administrador-bien.module';
 
 @Module({
+  imports: [AdministradorBienModule],
   controllers: [
     AutoController,
     DocumentoAutoController,

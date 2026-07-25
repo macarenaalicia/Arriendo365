@@ -1,10 +1,38 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { descargarCsv } from '../lib/exportarCsv';
 import { subirFoto } from '../lib/fotos';
+import { descargarArchivo } from '../lib/descargas';
+import { useCalificaciones } from '../lib/useCalificaciones';
 import { Modal } from '../components/Modal';
-import { IconEditar, IconEliminar, IconReabrir, IconRechazar, IconVer } from '../components/icons';
+import {
+  IconDescargar,
+  IconEditar,
+  IconEliminar,
+  IconReabrir,
+  IconRechazar,
+  IconVer,
+} from '../components/icons';
+import { CalificacionSelect } from '../components/CalificacionSelect';
+import { TecnicoSelect } from '../components/TecnicoSelect';
+import { OnboardingTour } from '../components/OnboardingTour';
+import { useOnboardingTour } from '../lib/useOnboardingTour';
+
+const REQUERIMIENTOS_TOUR_STEPS = [
+  {
+    target: 'requerimientos-nuevo',
+    titulo: 'Crea un requerimiento',
+    texto: 'Registra una solicitud de mantención o reparación para un arriendo.',
+  },
+  {
+    target: 'requerimientos-tabla',
+    titulo: 'Seguimiento de requerimientos',
+    texto:
+      'Aquí ves el estado de cada requerimiento. Usa los íconos para ver el detalle, descargar, editar o rechazar.',
+  },
+];
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import {
   HistorialRequerimientoBoton,
@@ -15,12 +43,10 @@ import type {
   EstadoRequerimiento,
   Persona,
   Requerimiento,
-  TipoReparacion,
   UrgenciaRequerimiento,
 } from '../api/types';
 
 const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
-const TIPOS_REPARACION: TipoReparacion[] = ['LOCATIVA', 'ESTRUCTURAL'];
 const ESTADOS_REQUERIMIENTO: EstadoRequerimiento[] = [
   'PENDIENTE_REVISION',
   'REVISION_AGENDADA',
@@ -32,29 +58,38 @@ const ESTADOS_REQUERIMIENTO: EstadoRequerimiento[] = [
 
 const EDIT_FORM_INICIAL = {
   urgencia: 'MEDIA' as UrgenciaRequerimiento,
-  tipoReparacion: 'LOCATIVA' as TipoReparacion,
+  calificacionId: '',
   estado: 'PENDIENTE_REVISION' as EstadoRequerimiento,
   tecnicoId: '',
   notasInternas: '',
   notasArrendatario: '',
   detalleResolucion: '',
+  inspeccion: '',
+  detalleGasto: '',
+  totalGasto: '',
 };
 
 const CREATE_FORM_INICIAL = {
   arriendoPropiedadId: '',
   urgencia: 'MEDIA' as UrgenciaRequerimiento,
-  tipoReparacion: 'LOCATIVA' as TipoReparacion,
+  calificacionId: '',
   notasArrendatario: '',
 };
 
 const MAX_FOTOS_REQUERIMIENTO = 10;
 
 export function RequerimientosResumenPage() {
+  const { rol } = useAuth();
+  const esPropietarioOAdmin = rol === 'ADMINISTRADOR' || rol === 'PROPIETARIO';
+  const esPropietario = rol === 'PROPIETARIO';
+  const { calificaciones, recargarCalificaciones } = useCalificaciones();
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
   const [arriendos, setArriendos] = useState<ArriendoPropiedad[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
+  const tour = useOnboardingTour('requerimientos');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [descargandoId, setDescargandoId] = useState<string | null>(null);
 
   const [filtroEstado, setFiltroEstado] = useState<EstadoRequerimiento | ''>('');
   const [filtroUrgencia, setFiltroUrgencia] = useState<UrgenciaRequerimiento | ''>('');
@@ -153,7 +188,7 @@ export function RequerimientosResumenPage() {
           arriendo ? `${arriendo.propiedad.calle} ${arriendo.propiedad.numero}` : '',
           arriendo?.arrendatario.nombreCompleto ?? '',
           req.urgencia,
-          req.tipoReparacion,
+          req.calificacion.nombre,
           req.estado.replace(/_/g, ' '),
           req.tecnico?.nombreCompleto ?? '',
           req.notasArrendatario ?? '',
@@ -189,12 +224,15 @@ export function RequerimientosResumenPage() {
     cerrarCreacion();
     setForm({
       urgencia: req.urgencia,
-      tipoReparacion: req.tipoReparacion,
+      calificacionId: req.calificacionId,
       estado: req.estado,
       tecnicoId: req.tecnicoId ?? '',
       notasInternas: req.notasInternas ?? '',
       notasArrendatario: req.notasArrendatario ?? '',
       detalleResolucion: req.detalleResolucion ?? '',
+      inspeccion: req.inspeccion ?? '',
+      detalleGasto: req.detalleGasto ?? '',
+      totalGasto: req.totalGasto ?? '',
     });
     setEditingId(req.id);
     setFormError(null);
@@ -227,7 +265,7 @@ export function RequerimientosResumenPage() {
       const creado = await api.post<Requerimiento>('/requerimientos', {
         arriendoPropiedadId: createForm.arriendoPropiedadId,
         urgencia: createForm.urgencia,
-        tipoReparacion: createForm.tipoReparacion,
+        calificacionId: createForm.calificacionId,
         notasArrendatario: createForm.notasArrendatario || undefined,
       });
 
@@ -256,12 +294,15 @@ export function RequerimientosResumenPage() {
     try {
       await api.patch(`/requerimientos/${editingId}`, {
         urgencia: form.urgencia,
-        tipoReparacion: form.tipoReparacion,
+        calificacionId: form.calificacionId,
         estado: form.estado,
         tecnicoId: form.tecnicoId || undefined,
         notasInternas: form.notasInternas || undefined,
         notasArrendatario: form.notasArrendatario || undefined,
         detalleResolucion: form.detalleResolucion || undefined,
+        inspeccion: esPropietarioOAdmin ? form.inspeccion || undefined : undefined,
+        detalleGasto: esPropietario ? form.detalleGasto || undefined : undefined,
+        totalGasto: esPropietario && form.totalGasto ? Number(form.totalGasto) : undefined,
       });
       cerrarForm();
       cargarRequerimientos();
@@ -298,6 +339,15 @@ export function RequerimientosResumenPage() {
   };
   const eliminarConfirmar = useConfirmarEliminar<string>(handleDelete);
 
+  const handleDescargar = async (reqId: string) => {
+    setDescargandoId(reqId);
+    try {
+      await descargarArchivo(`/requerimientos/${reqId}/descarga.pdf`, `requerimiento-${reqId}.pdf`);
+    } finally {
+      setDescargandoId(null);
+    }
+  };
+
   if (loading) return <p>Cargando…</p>;
   if (loadError) return <p className="error-text">{loadError}</p>;
 
@@ -328,7 +378,7 @@ export function RequerimientosResumenPage() {
               </option>
             ))}
           </select>
-          <button type="button" onClick={abrirCreacion}>
+          <button type="button" data-tour="requerimientos-nuevo" onClick={abrirCreacion}>
             + Nuevo requerimiento
           </button>
           {seleccionados.size > 0 && (
@@ -377,19 +427,14 @@ export function RequerimientosResumenPage() {
               </select>
             </label>
             <label>
-              Tipo de reparación
-              <select
-                value={createForm.tipoReparacion}
-                onChange={(e) =>
-                  setCreateForm({ ...createForm, tipoReparacion: e.target.value as TipoReparacion })
-                }
-              >
-                {TIPOS_REPARACION.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              Calificación
+              <CalificacionSelect
+                calificaciones={calificaciones}
+                value={createForm.calificacionId}
+                onChange={(calificacionId) => setCreateForm({ ...createForm, calificacionId })}
+                permitirCrear
+                onCalificacionCreada={() => recargarCalificaciones()}
+              />
             </label>
           </div>
 
@@ -477,19 +522,14 @@ export function RequerimientosResumenPage() {
               </select>
             </label>
             <label>
-              Tipo de reparación
-              <select
-                value={form.tipoReparacion}
-                onChange={(e) =>
-                  setForm({ ...form, tipoReparacion: e.target.value as TipoReparacion })
-                }
-              >
-                {TIPOS_REPARACION.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              Calificación
+              <CalificacionSelect
+                calificaciones={calificaciones}
+                value={form.calificacionId}
+                onChange={(calificacionId) => setForm({ ...form, calificacionId })}
+                permitirCrear
+                onCalificacionCreada={() => recargarCalificaciones()}
+              />
             </label>
             <label>
               Estado
@@ -508,19 +548,12 @@ export function RequerimientosResumenPage() {
             </label>
             <label>
               Técnico asignado
-              <select
+              <TecnicoSelect
+                personas={personas}
                 value={form.tecnicoId}
-                onChange={(e) => setForm({ ...form, tecnicoId: e.target.value })}
-              >
-                <option value="">Sin asignar</option>
-                {personas
-                  .filter((p) => p.tipoPersona === 'TECNICO' || p.id === form.tecnicoId)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombreCompleto}
-                    </option>
-                  ))}
-              </select>
+                onChange={(tecnicoId) => setForm({ ...form, tecnicoId })}
+                onPersonaCreada={(persona) => setPersonas((prev) => [...prev, persona])}
+              />
             </label>
           </div>
 
@@ -551,6 +584,37 @@ export function RequerimientosResumenPage() {
             </label>
           )}
 
+          {esPropietarioOAdmin && (
+            <label>
+              Inspección
+              <textarea
+                value={form.inspeccion}
+                onChange={(e) => setForm({ ...form, inspeccion: e.target.value })}
+              />
+            </label>
+          )}
+          {esPropietario && (
+            <>
+              <label>
+                Detalle gasto
+                <textarea
+                  rows={5}
+                  value={form.detalleGasto}
+                  onChange={(e) => setForm({ ...form, detalleGasto: e.target.value })}
+                />
+              </label>
+              <label>
+                Total gasto
+                <input
+                  type="number"
+                  min={0}
+                  value={form.totalGasto}
+                  onChange={(e) => setForm({ ...form, totalGasto: e.target.value })}
+                />
+              </label>
+            </>
+          )}
+
           {formError && <p className="auth-card__error">{formError}</p>}
 
           <div className="table__actions">
@@ -569,7 +633,7 @@ export function RequerimientosResumenPage() {
         <p className="empty-state">No hay requerimientos que coincidan con este filtro.</p>
       )}
       {requerimientos.length > 0 && (
-        <div className="table-wrap">
+        <div className="table-wrap" data-tour="requerimientos-tabla">
           <table className="table">
             <thead>
               <tr>
@@ -583,7 +647,7 @@ export function RequerimientosResumenPage() {
                 </th>
                 <th>Arriendo</th>
                 <th>Urgencia</th>
-                <th>Tipo</th>
+                <th>Calificación</th>
                 <th>Estado</th>
                 <th>Técnico</th>
                 <th>Descripción</th>
@@ -620,11 +684,7 @@ export function RequerimientosResumenPage() {
                           {req.urgencia}
                         </span>
                       </td>
-                      <td>
-                        <span className={`badge badge--${req.tipoReparacion.toLowerCase()}`}>
-                          {req.tipoReparacion}
-                        </span>
-                      </td>
+                      <td>{req.calificacion.nombre}</td>
                       <td>
                         <span className={`badge badge--${req.estado.toLowerCase()}`}>
                           {req.estado.replace(/_/g, ' ')}
@@ -651,6 +711,16 @@ export function RequerimientosResumenPage() {
                           >
                             <IconVer />
                           </Link>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            title="Descargar"
+                            aria-label="Descargar"
+                            disabled={descargandoId === req.id}
+                            onClick={() => handleDescargar(req.id)}
+                          >
+                            <IconDescargar />
+                          </button>
                           {req.estado === 'RESUELTO' || req.estado === 'RECHAZADO' ? (
                             <button
                               type="button"
@@ -709,6 +779,9 @@ export function RequerimientosResumenPage() {
         </div>
       )}
       {eliminarConfirmar.modal}
+      {tour.activo && !loading && (
+        <OnboardingTour steps={REQUERIMIENTOS_TOUR_STEPS} onCerrar={tour.cerrar} />
+      )}
     </div>
   );
 }

@@ -6,21 +6,18 @@ import {
 } from '../components/HistorialRequerimiento';
 import { eliminarFoto, listarFotos, subirFoto } from '../lib/fotos';
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
-import type {
-  ArriendoPropiedad,
-  Foto,
-  Requerimiento,
-  TipoReparacion,
-  UrgenciaRequerimiento,
-} from '../api/types';
+import { useCalificaciones } from '../lib/useCalificaciones';
+import { descargarArchivo } from '../lib/descargas';
+import { CalificacionSelect } from '../components/CalificacionSelect';
+import { IconDescargar } from '../components/icons';
+import type { ArriendoPropiedad, Foto, Requerimiento, UrgenciaRequerimiento } from '../api/types';
 
 const URGENCIAS: UrgenciaRequerimiento[] = ['BAJA', 'MEDIA', 'CRITICA'];
-const TIPOS_REPARACION: TipoReparacion[] = ['LOCATIVA', 'ESTRUCTURAL'];
 const MAX_FOTOS_REQUERIMIENTO = 10;
 
 const REQ_FORM_INICIAL = {
   urgencia: 'MEDIA' as UrgenciaRequerimiento,
-  tipoReparacion: 'LOCATIVA' as TipoReparacion,
+  calificacionId: '',
   notasArrendatario: '',
 };
 
@@ -45,6 +42,17 @@ function BloqueArriendoRequerimientos({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historialAbiertoId, setHistorialAbiertoId] = useState<string | null>(null);
+  const [descargandoId, setDescargandoId] = useState<string | null>(null);
+  const { calificaciones } = useCalificaciones();
+
+  const handleDescargar = async (reqId: string) => {
+    setDescargandoId(reqId);
+    try {
+      await descargarArchivo(`/requerimientos/${reqId}/descarga.pdf`, `requerimiento-${reqId}.pdf`);
+    } finally {
+      setDescargandoId(null);
+    }
+  };
 
   const [fotosAbiertoId, setFotosAbiertoId] = useState<string | null>(null);
   const [fotos, setFotos] = useState<Foto[]>([]);
@@ -144,7 +152,7 @@ function BloqueArriendoRequerimientos({
       const creado = await api.post<Requerimiento>('/requerimientos', {
         arriendoPropiedadId: arriendo.id,
         urgencia: form.urgencia,
-        tipoReparacion: form.tipoReparacion,
+        calificacionId: form.calificacionId,
         notasArrendatario: form.notasArrendatario || undefined,
       });
 
@@ -213,19 +221,12 @@ function BloqueArriendoRequerimientos({
                   </select>
                 </label>
                 <label>
-                  Tipo de reparación
-                  <select
-                    value={form.tipoReparacion}
-                    onChange={(e) =>
-                      setForm({ ...form, tipoReparacion: e.target.value as TipoReparacion })
-                    }
-                  >
-                    {TIPOS_REPARACION.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
+                  Calificación
+                  <CalificacionSelect
+                    calificaciones={calificaciones}
+                    value={form.calificacionId}
+                    onChange={(calificacionId) => setForm({ ...form, calificacionId })}
+                  />
                 </label>
               </div>
 
@@ -301,13 +302,14 @@ function BloqueArriendoRequerimientos({
                 <thead>
                   <tr>
                     <th style={{ width: '90px' }}>Urgencia</th>
-                    <th style={{ width: '100px' }}>Tipo</th>
+                    <th style={{ width: '120px' }}>Calificación</th>
                     <th style={{ width: '130px' }}>Estado</th>
                     <th style={{ width: '150px' }}>Técnico</th>
                     <th>Descripción</th>
                     <th style={{ width: '160px' }}>Resolución</th>
                     <th style={{ width: '90px' }}>Fotos</th>
                     <th style={{ width: '110px' }}>Historial</th>
+                    <th style={{ width: '60px' }}>Descargar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -322,11 +324,7 @@ function BloqueArriendoRequerimientos({
                               {req.urgencia}
                             </span>
                           </td>
-                          <td>
-                            <span className={`badge badge--${req.tipoReparacion.toLowerCase()}`}>
-                              {req.tipoReparacion}
-                            </span>
-                          </td>
+                          <td>{req.calificacion.nombre}</td>
                           <td className="table__cell-wrap">
                             <span className={`badge badge--${req.estado.toLowerCase()}`}>
                               {req.estado.replace(/_/g, ' ')}
@@ -353,16 +351,28 @@ function BloqueArriendoRequerimientos({
                               }
                             />
                           </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Descargar"
+                              aria-label="Descargar"
+                              disabled={descargandoId === req.id}
+                              onClick={() => handleDescargar(req.id)}
+                            >
+                              <IconDescargar />
+                            </button>
+                          </td>
                         </tr>
                         {historialAbierto && (
                           <HistorialRequerimientoFilas
                             actualizaciones={req.actualizaciones}
-                            colSpan={8}
+                            colSpan={9}
                           />
                         )}
                         {fotosAbierto && (
                           <tr>
-                            <td colSpan={8}>
+                            <td colSpan={9}>
                               <div className="proveedores-panel">
                                 {fotoError && <p className="auth-card__error">{fotoError}</p>}
                                 {fotos.length === 0 && (

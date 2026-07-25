@@ -45,4 +45,9 @@ export class PropiedadController {
   remove(@Param('id') id: string) {
     return this.propiedadService.remove(id);
   }
+
+  @Post(':id/duplicar')
+  duplicar(@Param('id') id: string) {
+    return this.propiedadService.duplicar(id);
+  }
 }

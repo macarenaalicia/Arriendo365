@@ -1,30 +1,57 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
-import type { Persona, RolUsuario, Usuario } from '../api/types';
+import type { Auto, PerfilPersona, Persona, Propiedad, RolUsuario, Usuario } from '../api/types';
 import { ddmmyyyyToIso, isoToDdmmyyyy } from '../lib/format';
+import { esRutValido } from '../lib/rut';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
 import { IconEditar, IconEliminar, IconLlave } from '../components/icons';
+import { OnboardingTour } from '../components/OnboardingTour';
+import { useOnboardingTour } from '../lib/useOnboardingTour';
+
+const PERSONAS_TOUR_STEPS = [
+  {
+    target: 'personas-nueva',
+    titulo: 'Agrega personas',
+    texto:
+      'Registra arrendatarios, propietarios, administradores, técnicos o codeudores. Según el perfil elegido, se les crea acceso automático al sistema.',
+  },
+  {
+    target: 'personas-acceso',
+    titulo: 'Acceso al sistema',
+    texto: 'Con este ícono puedes revisar o cambiar el acceso (rol, contraseña) de cada persona.',
+  },
+];
 
 const FORM_INICIAL = {
   nombreCompleto: '',
   rut: '',
-  tipoPersona: '' as RolUsuario | '',
+  tipoPersona: '' as PerfilPersona | '',
   email: '',
   telefono: '',
   direccion: '',
   fechaNacimiento: '',
 };
 
-const ROLES: RolUsuario[] = ['ARRENDATARIO', 'TECNICO', 'ADMINISTRADOR', 'PROPIETARIO'];
+const PERFILES: PerfilPersona[] = ['ARRENDATARIO', 'CODEUDOR', 'TECNICO', 'ADMINISTRADOR', 'PROPIETARIO'];
 
-const TIPO_PERSONA_LABELS: Record<RolUsuario, string> = {
+// Perfiles que corresponden a un uso real de la plataforma: al crear una
+// persona con uno de estos perfiles el backend le crea acceso automático
+// con contraseña inicial "1234" (debe cambiarla en su primer inicio de sesión).
+const PERFILES_CON_ACCESO_AUTOMATICO: PerfilPersona[] = ['ADMINISTRADOR', 'PROPIETARIO', 'ARRENDATARIO'];
+// Un técnico o codeudor nunca puede tener una cuenta de acceso.
+const PERFILES_SIN_ACCESO: PerfilPersona[] = ['TECNICO', 'CODEUDOR'];
+
+const PERFIL_PERSONA_LABELS: Record<PerfilPersona, string> = {
   ADMINISTRADOR: 'Administrador',
   PROPIETARIO: 'Propietario',
   ARRENDATARIO: 'Arrendatario',
   TECNICO: 'Técnico',
+  CODEUDOR: 'Codeudor',
 };
+
+const ROLES_USUARIO: RolUsuario[] = ['ARRENDATARIO', 'ADMINISTRADOR', 'PROPIETARIO', 'TECNICO'];
 
 const ACCESO_FORM_INICIAL = {
   rol: 'ARRENDATARIO' as RolUsuario,
@@ -35,17 +62,28 @@ const ACCESO_FORM_INICIAL = {
 export function PersonasListPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
+  const tour = useOnboardingTour('personas');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM_INICIAL);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [mensaje, setMensaje] = useState<string | null>(null);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [accesoPersonaId, setAccesoPersonaId] = useState<string | null>(null);
   const [accesoForm, setAccesoForm] = useState(ACCESO_FORM_INICIAL);
   const [accesoError, setAccesoError] = useState<string | null>(null);
   const [savingAcceso, setSavingAcceso] = useState(false);
+
+  const [propiedades, setPropiedades] = useState<Propiedad[]>([]);
+  const [autos, setAutos] = useState<Auto[]>([]);
+  const [bienesForm, setBienesForm] = useState<{ propiedadIds: string[]; autoIds: string[] }>({
+    propiedadIds: [],
+    autoIds: [],
+  });
+  const [savingBienes, setSavingBienes] = useState(false);
+  const [bienesError, setBienesError] = useState<string | null>(null);
 
   const cargar = () => {
     setLoading(true);
@@ -93,6 +131,11 @@ export function PersonasListPage() {
     event.preventDefault();
     setError(null);
 
+    if (form.rut && !esRutValido(form.rut)) {
+      setError('El RUT ingresado no es válido.');
+      return;
+    }
+
     let fechaNacimiento: string | undefined;
     if (form.fechaNacimiento) {
       fechaNacimiento = ddmmyyyyToIso(form.fechaNacimiento);
@@ -118,10 +161,16 @@ export function PersonasListPage() {
         await api.patch(`/personas/${editingId}`, payload);
       } else {
         await api.post('/personas', payload);
+        if (form.tipoPersona && PERFILES_CON_ACCESO_AUTOMATICO.includes(form.tipoPersona)) {
+          setMensaje(
+            `Se creó acceso automático para ${form.nombreCompleto} con contraseña inicial "1234". Deberá cambiarla en su primer inicio de sesión.`,
+          );
+        }
       }
 
       cerrarForm();
       cargar();
+      cargarUsuarios();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo guardar la persona');
     } finally {
@@ -138,15 +187,54 @@ export function PersonasListPage() {
   const abrirAcceso = (personaId: string) => {
     setAccesoPersonaId(personaId);
     setAccesoError(null);
+    setBienesError(null);
+    setBienesForm({ propiedadIds: [], autoIds: [] });
     const usuario = usuarios.find((u) => u.personaId === personaId);
     setAccesoForm(
       usuario ? { rol: usuario.rol, activo: usuario.activo, password: '' } : ACCESO_FORM_INICIAL,
     );
+    if (usuario && usuario.rol === 'ADMINISTRADOR') {
+      if (propiedades.length === 0) api.get<Propiedad[]>('/propiedades').then(setPropiedades);
+      if (autos.length === 0) api.get<Auto[]>('/autos').then(setAutos);
+      api
+        .get<{ propiedadIds: string[]; autoIds: string[] }>(`/usuarios/${usuario.id}/bienes`)
+        .then(setBienesForm);
+    }
   };
 
   const cerrarAcceso = () => {
     setAccesoPersonaId(null);
     setAccesoError(null);
+  };
+
+  const toggleBienPropiedad = (propiedadId: string) => {
+    setBienesForm((prev) => ({
+      ...prev,
+      propiedadIds: prev.propiedadIds.includes(propiedadId)
+        ? prev.propiedadIds.filter((id) => id !== propiedadId)
+        : [...prev.propiedadIds, propiedadId],
+    }));
+  };
+
+  const toggleBienAuto = (autoId: string) => {
+    setBienesForm((prev) => ({
+      ...prev,
+      autoIds: prev.autoIds.includes(autoId)
+        ? prev.autoIds.filter((id) => id !== autoId)
+        : [...prev.autoIds, autoId],
+    }));
+  };
+
+  const handleGuardarBienes = async (usuarioId: string) => {
+    setBienesError(null);
+    setSavingBienes(true);
+    try {
+      await api.put(`/usuarios/${usuarioId}/bienes`, bienesForm);
+    } catch (err) {
+      setBienesError(err instanceof ApiError ? err.message : 'No se pudieron guardar los bienes asignados');
+    } finally {
+      setSavingBienes(false);
+    }
   };
 
   const handleGuardarAcceso = async () => {
@@ -197,10 +285,19 @@ export function PersonasListPage() {
     <div>
       <div className="page-header">
         <h1>Personas</h1>
-        <button type="button" onClick={abrirCreacion}>
+        <button type="button" data-tour="personas-nueva" onClick={abrirCreacion}>
           + Nueva persona
         </button>
       </div>
+
+      {mensaje && (
+        <p className="empty-state">
+          {mensaje}{' '}
+          <button type="button" className="link-button" onClick={() => setMensaje(null)}>
+            Cerrar
+          </button>
+        </p>
+      )}
 
       {showForm && (
         <Modal titulo={editingId ? 'Editar persona' : 'Nueva persona'} onClose={cerrarForm}>
@@ -223,17 +320,17 @@ export function PersonasListPage() {
               />
             </label>
             <label>
-              Tipo de persona
+              Perfil
               <select
                 value={form.tipoPersona}
                 onChange={(e) =>
-                  setForm({ ...form, tipoPersona: e.target.value as RolUsuario | '' })
+                  setForm({ ...form, tipoPersona: e.target.value as PerfilPersona | '' })
                 }
               >
                 <option value="">Sin especificar</option>
-                {ROLES.map((rol) => (
-                  <option key={rol} value={rol}>
-                    {TIPO_PERSONA_LABELS[rol]}
+                {PERFILES.map((perfil) => (
+                  <option key={perfil} value={perfil}>
+                    {PERFIL_PERSONA_LABELS[perfil]}
                   </option>
                 ))}
               </select>
@@ -291,7 +388,7 @@ export function PersonasListPage() {
               <tr>
                 <th>Nombre</th>
                 <th>RUT</th>
-                <th>Tipo</th>
+                <th>Perfil</th>
                 <th>Email</th>
                 <th>Teléfono</th>
                 <th>Dirección</th>
@@ -306,7 +403,7 @@ export function PersonasListPage() {
                   <td>
                     {persona.tipoPersona && (
                       <span className={`badge badge--${persona.tipoPersona.toLowerCase()}`}>
-                        {TIPO_PERSONA_LABELS[persona.tipoPersona]}
+                        {PERFIL_PERSONA_LABELS[persona.tipoPersona]}
                       </span>
                     )}
                   </td>
@@ -315,15 +412,18 @@ export function PersonasListPage() {
                   <td>{persona.direccion ?? ''}</td>
                   <td>
                     <div className="table__actions">
-                      <button
-                        type="button"
-                        className="icon-button"
-                        title="Acceso al sistema"
-                        aria-label="Acceso al sistema"
-                        onClick={() => abrirAcceso(persona.id)}
-                      >
-                        <IconLlave />
-                      </button>
+                      {!(persona.tipoPersona && PERFILES_SIN_ACCESO.includes(persona.tipoPersona)) && (
+                        <button
+                          type="button"
+                          data-tour="personas-acceso"
+                          className="icon-button"
+                          title="Acceso al sistema"
+                          aria-label="Acceso al sistema"
+                          onClick={() => abrirAcceso(persona.id)}
+                        >
+                          <IconLlave />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="icon-button"
@@ -375,7 +475,7 @@ export function PersonasListPage() {
                       setAccesoForm({ ...accesoForm, rol: e.target.value as RolUsuario })
                     }
                   >
-                    {ROLES.map((rol) => (
+                    {ROLES_USUARIO.map((rol) => (
                       <option key={rol} value={rol}>
                         {rol}
                       </option>
@@ -420,12 +520,61 @@ export function PersonasListPage() {
                   </button>
                 )}
               </div>
+
+              {usuario && accesoForm.rol === 'ADMINISTRADOR' && (
+                <div className="proveedores-panel">
+                  <h3>Bienes que administra</h3>
+                  <p className="empty-state">
+                    Sin marcar ningún bien, este administrador ve todos los de la organización
+                    (como hoy). Marca solo los bienes que debe administrar para acotar su acceso.
+                  </p>
+                  <div className="inline-form__grid">
+                    <div>
+                      <strong>Propiedades</strong>
+                      {propiedades.map((p) => (
+                        <label key={p.id} className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={bienesForm.propiedadIds.includes(p.id)}
+                            onChange={() => toggleBienPropiedad(p.id)}
+                          />
+                          {p.calle} {p.numero}
+                        </label>
+                      ))}
+                    </div>
+                    <div>
+                      <strong>Autos</strong>
+                      {autos.map((a) => (
+                        <label key={a.id} className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={bienesForm.autoIds.includes(a.id)}
+                            onChange={() => toggleBienAuto(a.id)}
+                          />
+                          {a.patente}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {bienesError && <p className="auth-card__error">{bienesError}</p>}
+                  <button
+                    type="button"
+                    disabled={savingBienes}
+                    onClick={() => handleGuardarBienes(usuario.id)}
+                  >
+                    {savingBienes ? 'Guardando…' : 'Guardar bienes asignados'}
+                  </button>
+                </div>
+              )}
             </div>
           </Modal>
         );
       })()}
       {eliminarPersona.modal}
       {eliminarAcceso.modal}
+      {tour.activo && !loading && (
+        <OnboardingTour steps={PERSONAS_TOUR_STEPS} onCerrar={tour.cerrar} />
+      )}
     </div>
   );
 }

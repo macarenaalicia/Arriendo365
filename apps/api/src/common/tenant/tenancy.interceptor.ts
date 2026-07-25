@@ -16,6 +16,7 @@ export class TenancyInterceptor implements NestInterceptor {
         usuarioId: req.user.sub,
         personaId: req.user.personaId,
         rol: req.user.rol,
+        esSuperAdmin: req.user.esSuperAdmin,
       });
     }
 

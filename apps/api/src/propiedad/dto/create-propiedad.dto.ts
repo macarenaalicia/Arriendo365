@@ -84,4 +84,16 @@ export class CreatePropiedadDto {
   @IsNumber()
   @Min(0)
   precioArriendoEsperado?: number;
+
+  @IsOptional()
+  @IsString()
+  fojasInscripcion?: string;
+
+  @IsOptional()
+  @IsString()
+  numeroInscripcion?: string;
+
+  @IsOptional()
+  @IsInt()
+  anioInscripcion?: number;
 }

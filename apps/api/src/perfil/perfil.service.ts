@@ -21,6 +21,10 @@ export class PerfilService {
     if (!persona) {
       throw new NotFoundException('Persona no encontrada');
     }
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: this.tenant.usuarioId },
+      select: { debeCambiarPassword: true },
+    });
 
     return {
       nombreCompleto: persona.nombreCompleto,
@@ -28,6 +32,7 @@ export class PerfilService {
       email: persona.email,
       telefono: persona.telefono,
       rol: this.tenant.rol,
+      debeCambiarPassword: usuario?.debeCambiarPassword ?? false,
     };
   }
 
@@ -60,6 +65,9 @@ export class PerfilService {
     }
 
     const passwordHash = await bcrypt.hash(dto.passwordNueva, SALT_ROUNDS);
-    await this.prisma.usuario.update({ where: { id: usuario.id }, data: { passwordHash } });
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { passwordHash, debeCambiarPassword: false },
+    });
   }
 }

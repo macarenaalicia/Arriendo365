@@ -25,6 +25,8 @@ import { ChatModule } from './chat/chat.module';
 import { UsuarioModule } from './usuario/usuario.module';
 import { PublicPropiedadesModule } from './public-propiedades/public-propiedades.module';
 import { PerfilModule } from './perfil/perfil.module';
+import { AdministradorBienModule } from './administrador-bien/administrador-bien.module';
+import { CalificacionRequerimientoModule } from './calificacion-requerimiento/calificacion-requerimiento.module';
 
 @Module({
   imports: [
@@ -51,6 +53,8 @@ import { PerfilModule } from './perfil/perfil.module';
     UsuarioModule,
     PublicPropiedadesModule,
     PerfilModule,
+    AdministradorBienModule,
+    CalificacionRequerimientoModule,
   ],
   controllers: [AppController],
   providers: [

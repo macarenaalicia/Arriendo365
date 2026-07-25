@@ -13,6 +13,7 @@ const SELECT_SIN_PASSWORD = {
   personaId: true,
   rol: true,
   activo: true,
+  debeCambiarPassword: true,
   createdAt: true,
   updatedAt: true,
   persona: {
@@ -34,10 +35,17 @@ export class UsuarioService {
     if (!persona) {
       throw new NotFoundException('Persona no encontrada');
     }
+    return persona;
   }
 
   async create(dto: CreateUsuarioDto) {
-    await this.assertPersonaEnOrganizacion(dto.personaId);
+    const persona = await this.assertPersonaEnOrganizacion(dto.personaId);
+
+    if (persona.tipoPersona === 'TECNICO' || persona.tipoPersona === 'CODEUDOR') {
+      throw new ConflictException(
+        'Un técnico o codeudor no puede tener una cuenta de acceso a la plataforma',
+      );
+    }
 
     const existente = await this.prisma.usuario.findFirst({
       where: { personaId: dto.personaId, organizacionId: this.tenant.organizacionId },
@@ -54,6 +62,7 @@ export class UsuarioService {
         personaId: dto.personaId,
         rol: dto.rol,
         passwordHash,
+        debeCambiarPassword: true,
       },
       select: SELECT_SIN_PASSWORD,
     });
@@ -88,6 +97,9 @@ export class UsuarioService {
       data: {
         ...resto,
         passwordHash: password ? await bcrypt.hash(password, SALT_ROUNDS) : undefined,
+        // Una contraseña asignada por un administrador debe cambiarse en el
+        // próximo inicio de sesión, igual que la clave inicial "1234".
+        debeCambiarPassword: password ? true : undefined,
       },
       select: SELECT_SIN_PASSWORD,
     });

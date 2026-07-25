@@ -42,6 +42,12 @@ export class CreateArriendoPropiedadDto {
   periodoAlza: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  ipcPorcentaje?: number;
+
+  @IsOptional()
   @IsBoolean()
   garantia?: boolean;
 

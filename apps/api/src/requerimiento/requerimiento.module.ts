@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PdfModule } from '../pdf/pdf.module';
 import { RequerimientoService } from './requerimiento.service';
 import { RequerimientoController } from './requerimiento.controller';
 import { GastoService } from './gasto/gasto.service';
@@ -6,7 +7,7 @@ import { GastoController } from './gasto/gasto.controller';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [MailModule],
+  imports: [MailModule, PdfModule],
   controllers: [RequerimientoController, GastoController],
   providers: [RequerimientoService, GastoService],
 })
