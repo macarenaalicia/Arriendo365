@@ -15,7 +15,14 @@ import type {
   TipoProveedor,
   UrgenciaRequerimiento,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy, isoToDdmmyyyy } from '../lib/format';
+import {
+  ddmmyyyyToIso,
+  formatFecha,
+  formatMonto,
+  hoyDdmmyyyy,
+  isoToDdmmyyyy,
+  sufijoUnidadPropiedad,
+} from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { useConfirmarEliminar } from '../lib/useConfirmarEliminar';
@@ -766,6 +773,7 @@ export function ArriendoDetailPage() {
       <div className="page-header">
         <h1>
           {arriendo.propiedad.calle} {arriendo.propiedad.numero}
+          {sufijoUnidadPropiedad(arriendo.propiedad)}
         </h1>
         <div className="page-header__actions">
           <button
@@ -786,7 +794,8 @@ export function ArriendoDetailPage() {
         <div className="detail-card">
           <h2>Propiedad</h2>
           <p>
-            {arriendo.propiedad.calle} {arriendo.propiedad.numero}, {arriendo.propiedad.ciudad}
+            {arriendo.propiedad.calle} {arriendo.propiedad.numero}
+            {sufijoUnidadPropiedad(arriendo.propiedad)}, {arriendo.propiedad.ciudad}
           </p>
           <p>
             {arriendo.propiedad.tipo} · {arriendo.propiedad.nHabitaciones} hab ·{' '}

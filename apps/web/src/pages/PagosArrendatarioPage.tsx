@@ -11,7 +11,7 @@ import type {
   Pago,
   TipoProveedor,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy } from '../lib/format';
+import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy, sufijoUnidadPropiedad } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { IconCheck, IconReloj } from '../components/icons';
@@ -347,6 +347,7 @@ function BloqueArriendo({ arriendo }: BloqueArriendoProps) {
       <h2>
         <Link to={`/arriendos/${arriendo.id}`}>
           {arriendo.propiedad.calle} {arriendo.propiedad.numero}
+          {sufijoUnidadPropiedad(arriendo.propiedad)}
         </Link>
       </h2>
 

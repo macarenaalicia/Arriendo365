@@ -15,7 +15,7 @@ import type {
   TipoPagoVehiculo,
   TipoProveedor,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy } from '../lib/format';
+import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy, sufijoUnidadPropiedad } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { IconCheck, IconReloj, IconRechazar } from '../components/icons';
@@ -402,7 +402,7 @@ export function PagosResumenPage() {
         const mapa: Record<string, ReferenciaArriendo> = {};
         const opciones: OpcionArriendo[] = [];
         arriendosPropiedad.forEach((a) => {
-          const label = `${a.propiedad.calle} ${a.propiedad.numero} — ${a.arrendatario.nombreCompleto}`;
+          const label = `${a.propiedad.calle} ${a.propiedad.numero}${sufijoUnidadPropiedad(a.propiedad)} — ${a.arrendatario.nombreCompleto}`;
           mapa[`propiedad-${a.id}`] = { label, link: `/arriendos/${a.id}` };
           opciones.push({
             key: `propiedad-${a.id}`,
@@ -716,7 +716,7 @@ export function PagosResumenPage() {
       ? arriendosPropiedad
           .filter((a) => a.estado === 'ACTIVO')
           .map((a) => {
-            const label = `${a.propiedad.calle} ${a.propiedad.numero} — ${a.arrendatario.nombreCompleto}`;
+            const label = `${a.propiedad.calle} ${a.propiedad.numero}${sufijoUnidadPropiedad(a.propiedad)} — ${a.arrendatario.nombreCompleto}`;
             return {
               key: `propiedad-${a.id}`,
               label,
