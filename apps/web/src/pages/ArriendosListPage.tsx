@@ -175,15 +175,26 @@ export function ArriendosListPage() {
     api.get<ArriendoAuto[]>('/arriendos-auto').then(setArriendosAuto);
   };
 
+  // Se vuelven a pedir después de crear un arriendo: el estado
+  // disponible/arrendada de la propiedad o auto recién usado cambia en el
+  // backend, y si no se refresca acá el selector de "Nuevo arriendo" lo
+  // sigue mostrando como disponible dentro de la misma sesión.
+  const cargarPropiedades = () => {
+    api.get<Propiedad[]>('/propiedades').then(setPropiedades);
+  };
+  const cargarAutos = () => {
+    api.get<Auto[]>('/autos').then(setAutos);
+  };
+
   useEffect(cargar, [estado]);
   useEffect(cargarArriendosAuto, []);
   useEffect(() => {
     if (!esStaff) return;
-    api.get<Propiedad[]>('/propiedades').then(setPropiedades);
+    cargarPropiedades();
     api.get<Persona[]>('/personas').then(setPersonas);
     api.get<Pago[]>('/pagos').then(setPagos);
     api.get<Requerimiento[]>('/requerimientos').then(setRequerimientos);
-    api.get<Auto[]>('/autos').then(setAutos);
+    cargarAutos();
   }, [esStaff]);
 
   useEffect(() => {
@@ -232,6 +243,7 @@ export function ArriendosListPage() {
       });
       cerrarForm();
       cargar();
+      cargarPropiedades();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'No se pudo crear el arriendo');
     } finally {
@@ -280,6 +292,7 @@ export function ArriendosListPage() {
       });
       cerrarAutoForm();
       cargarArriendosAuto();
+      cargarAutos();
     } catch (err) {
       setAutoFormError(err instanceof ApiError ? err.message : 'No se pudo crear el arriendo de auto');
     } finally {
