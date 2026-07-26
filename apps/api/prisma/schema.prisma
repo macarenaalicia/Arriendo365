@@ -37,6 +37,7 @@ enum TipoPropiedad {
   CASA
   DEPARTAMENTO
   HABITACION
+  LOFT
   TERRENO
 }
 
@@ -294,9 +295,17 @@ model Propiedad {
   calle                  String
   numero                 String
   numeroDepartamento     String?
-  // Solo aplica cuando tipo = HABITACION: identifica la pieza dentro de la
-  // propiedad (ej. "1", "2", "A", "B") cuando se arrienda por habitaciones.
+  // Solo aplica cuando tipo = HABITACION o LOFT: identifica la pieza dentro
+  // de la propiedad (ej. "1", "2", "A", "B") cuando se arrienda por partes.
   numeroHabitacion       String?
+  // Solo aplica cuando tipo = HABITACION o LOFT: a qué propiedad (casa,
+  // depto, etc.) pertenece esta pieza arrendable. Esa propiedad "madre" es
+  // la dueña de las cuentas de proveedores (agua/luz/gas) — las piezas no
+  // tienen las suyas propias, las comparten. Una propiedad madre no puede
+  // tener a su vez una madre (solo 2 niveles).
+  propiedadPadreId       String?
+  propiedadPadre         Propiedad?      @relation("PropiedadJerarquia", fields: [propiedadPadreId], references: [id])
+  piezas                 Propiedad[]     @relation("PropiedadJerarquia")
   sector                 String?
   ciudad                 String
   region                 String

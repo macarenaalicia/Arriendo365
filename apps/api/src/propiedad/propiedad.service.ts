@@ -13,7 +13,38 @@ export class PropiedadService {
     private readonly administradorBien: AdministradorBienService,
   ) {}
 
-  create(dto: CreatePropiedadDto) {
+  private async assertPadreValido(dto: { tipo: string; propiedadPadreId?: string }) {
+    const esPieza = dto.tipo === 'HABITACION' || dto.tipo === 'LOFT';
+
+    if (!esPieza) {
+      if (dto.propiedadPadreId) {
+        throw new ConflictException(
+          'Solo una habitación o loft puede tener una propiedad madre.',
+        );
+      }
+      return;
+    }
+
+    if (!dto.propiedadPadreId) {
+      throw new ConflictException('Elige a qué propiedad pertenece esta habitación o loft.');
+    }
+
+    const padre = await this.prisma.propiedad.findFirst({
+      where: { id: dto.propiedadPadreId, organizacionId: this.tenant.organizacionId },
+    });
+    if (!padre) {
+      throw new NotFoundException('La propiedad madre no existe');
+    }
+    if (padre.propiedadPadreId) {
+      throw new ConflictException(
+        'La propiedad madre no puede ser a su vez una habitación o loft de otra propiedad.',
+      );
+    }
+  }
+
+  async create(dto: CreatePropiedadDto) {
+    await this.assertPadreValido(dto);
+
     return this.prisma.propiedad.create({
       data: { ...dto, organizacionId: this.tenant.organizacionId },
     });
@@ -50,7 +81,15 @@ export class PropiedadService {
   }
 
   async update(id: string, dto: UpdatePropiedadDto) {
-    await this.findOne(id);
+    const actual = await this.findOne(id);
+
+    if (dto.tipo !== undefined || dto.propiedadPadreId !== undefined) {
+      await this.assertPadreValido({
+        tipo: dto.tipo ?? actual.tipo,
+        propiedadPadreId:
+          dto.propiedadPadreId !== undefined ? dto.propiedadPadreId : (actual.propiedadPadreId ?? undefined),
+      });
+    }
 
     return this.prisma.propiedad.update({
       where: { id },
@@ -67,6 +106,15 @@ export class PropiedadService {
     if (tieneArriendos) {
       throw new ConflictException(
         'No se puede eliminar una propiedad que tiene arriendos registrados.',
+      );
+    }
+
+    const tienePiezas = await this.prisma.propiedad.findFirst({
+      where: { propiedadPadreId: id },
+    });
+    if (tienePiezas) {
+      throw new ConflictException(
+        'No se puede eliminar una propiedad que tiene habitaciones o lofts asociados.',
       );
     }
 

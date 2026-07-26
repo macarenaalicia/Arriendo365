@@ -6,7 +6,7 @@ export type EstadoArriendo = 'ACTIVO' | 'INACTIVO' | 'TERMINADO';
 
 export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ATRASADO' | 'RECHAZADO';
 
-export type TipoPropiedad = 'CASA' | 'DEPARTAMENTO' | 'HABITACION' | 'TERRENO';
+export type TipoPropiedad = 'CASA' | 'DEPARTAMENTO' | 'HABITACION' | 'LOFT' | 'TERRENO';
 
 export type EstadoPropiedad = 'DISPONIBLE' | 'ARRENDADA' | 'EN_MANTENCION' | 'USUFRUCTO';
 
@@ -29,6 +29,7 @@ export interface Propiedad {
   numero: string;
   numeroDepartamento: string | null;
   numeroHabitacion: string | null;
+  propiedadPadreId: string | null;
   sector: string | null;
   ciudad: string;
   region: string;

@@ -574,6 +574,8 @@ export function PersonasListPage() {
                             onChange={() => toggleBienPropiedad(p.id)}
                           />
                           {p.calle} {p.numero}
+                          {p.numeroDepartamento ? ` depto ${p.numeroDepartamento}` : ''}
+                          {p.numeroHabitacion ? ` ${p.tipo === 'LOFT' ? 'loft' : 'hab.'} ${p.numeroHabitacion}` : ''}
                         </label>
                       ))}
                     </div>

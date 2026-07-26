@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import { EstadoPropiedad, TipoPropiedad } from '@prisma/client';
@@ -26,6 +27,13 @@ export class CreatePropiedadDto {
   @IsOptional()
   @IsString()
   numeroHabitacion?: string;
+
+  // Requerido cuando tipo = HABITACION o LOFT (se valida en el servicio,
+  // donde además se confirma que la propiedad madre exista en la
+  // organización y no sea a su vez una pieza).
+  @IsOptional()
+  @IsUUID()
+  propiedadPadreId?: string;
 
   @IsOptional()
   @IsString()

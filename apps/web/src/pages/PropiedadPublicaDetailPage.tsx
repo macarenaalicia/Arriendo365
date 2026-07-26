@@ -8,6 +8,7 @@ const TIPO_LABELS: Record<string, string> = {
   CASA: 'Casa',
   DEPARTAMENTO: 'Departamento',
   HABITACION: 'Habitación',
+  LOFT: 'Loft',
   TERRENO: 'Terreno',
 };
 

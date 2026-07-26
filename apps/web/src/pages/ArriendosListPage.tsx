@@ -433,6 +433,8 @@ export function ArriendosListPage() {
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.calle} {p.numero}
+                      {p.numeroDepartamento ? ` depto ${p.numeroDepartamento}` : ''}
+                      {p.numeroHabitacion ? ` ${p.tipo === 'LOFT' ? 'loft' : 'hab.'} ${p.numeroHabitacion}` : ''}
                     </option>
                   ))}
               </select>

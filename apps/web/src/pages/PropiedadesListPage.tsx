@@ -32,7 +32,8 @@ const PROPIEDADES_TOUR_STEPS = [
   },
 ];
 
-const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'TERRENO'] as const;
+const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'LOFT', 'TERRENO'] as const;
+const TIPOS_PIEZA: (typeof TIPOS)[number][] = ['HABITACION', 'LOFT'];
 const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION', 'USUFRUCTO'] as const;
 const MAX_FOTOS_PROPIEDAD = 10;
 
@@ -55,6 +56,7 @@ const FORM_INICIAL = {
   numero: '',
   numeroDepartamento: '',
   numeroHabitacion: '',
+  propiedadPadreId: '',
   sector: '',
   ciudad: '',
   region: '',
@@ -182,10 +184,12 @@ export function PropiedadesListPage() {
     }
   };
 
-  const propiedadesOrdenadas = useMemo(() => {
-    if (!sortField) return propiedades;
-    const copia = [...propiedades];
-    copia.sort((a, b) => {
+  // Las piezas (habitación/loft) siempre se muestran justo debajo de su
+  // propiedad madre, nunca sueltas mezcladas con el resto — el orden de
+  // columna solo reordena las propiedades madre/independientes.
+  const propiedadesAgrupadas = useMemo(() => {
+    const comparar = (a: Propiedad, b: Propiedad) => {
+      if (!sortField) return 0;
       const va = valorOrdenable(a, sortField);
       const vb = valorOrdenable(b, sortField);
       const cmp =
@@ -193,8 +197,20 @@ export function PropiedadesListPage() {
           ? va - vb
           : String(va).localeCompare(String(vb), 'es');
       return sortDir === 'asc' ? cmp : -cmp;
+    };
+
+    const principales = propiedades.filter((p) => !p.propiedadPadreId).sort(comparar);
+    const resultado: Propiedad[] = [];
+    principales.forEach((padre) => {
+      resultado.push(padre);
+      const piezas = propiedades
+        .filter((p) => p.propiedadPadreId === padre.id)
+        .sort((a, b) =>
+          (a.numeroHabitacion ?? '').localeCompare(b.numeroHabitacion ?? '', 'es', { numeric: true }),
+        );
+      resultado.push(...piezas);
     });
-    return copia;
+    return resultado;
   }, [propiedades, sortField, sortDir]);
 
   const guardarCampo = async (id: string, campo: string, valor: unknown) => {
@@ -266,6 +282,7 @@ export function PropiedadesListPage() {
       numero: propiedad.numero,
       numeroDepartamento: propiedad.numeroDepartamento ?? '',
       numeroHabitacion: propiedad.numeroHabitacion ?? '',
+      propiedadPadreId: propiedad.propiedadPadreId ?? '',
       sector: propiedad.sector ?? '',
       ciudad: propiedad.ciudad,
       region: propiedad.region,
@@ -306,6 +323,13 @@ export function PropiedadesListPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+
+    const esPieza = TIPOS_PIEZA.includes(form.tipo);
+    if (esPieza && !form.propiedadPadreId) {
+      setError('Elige a qué propiedad pertenece esta habitación o loft.');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -314,8 +338,8 @@ export function PropiedadesListPage() {
         numero: form.numero,
         numeroDepartamento:
           form.tipo === 'DEPARTAMENTO' && form.numeroDepartamento ? form.numeroDepartamento : undefined,
-        numeroHabitacion:
-          form.tipo === 'HABITACION' && form.numeroHabitacion ? form.numeroHabitacion : undefined,
+        numeroHabitacion: esPieza && form.numeroHabitacion ? form.numeroHabitacion : undefined,
+        propiedadPadreId: esPieza ? form.propiedadPadreId : null,
         sector: form.sector || undefined,
         ciudad: form.ciudad,
         region: form.region,
@@ -341,15 +365,17 @@ export function PropiedadesListPage() {
       } else {
         const creada = await api.post<Propiedad>('/propiedades', payload);
 
-        const candidatos: Array<{ tipo: TipoProveedor; empresa: string; nCliente: string }> = [
-          { tipo: 'AGUA', empresa: form.aguaEmpresa, nCliente: form.aguaCliente },
-          { tipo: 'LUZ', empresa: form.luzEmpresa, nCliente: form.luzCliente },
-          { tipo: 'GAS', empresa: form.gasEmpresa, nCliente: form.gasCliente },
-        ];
-        const proveedoresIniciales = candidatos.filter((p) => p.nCliente.trim() !== '');
+        if (!esPieza) {
+          const candidatos: Array<{ tipo: TipoProveedor; empresa: string; nCliente: string }> = [
+            { tipo: 'AGUA', empresa: form.aguaEmpresa, nCliente: form.aguaCliente },
+            { tipo: 'LUZ', empresa: form.luzEmpresa, nCliente: form.luzCliente },
+            { tipo: 'GAS', empresa: form.gasEmpresa, nCliente: form.gasCliente },
+          ];
+          const proveedoresIniciales = candidatos.filter((p) => p.nCliente.trim() !== '');
 
-        for (const proveedor of proveedoresIniciales) {
-          await api.post(`/propiedades/${creada.id}/proveedores`, proveedor);
+          for (const proveedor of proveedoresIniciales) {
+            await api.post(`/propiedades/${creada.id}/proveedores`, proveedor);
+          }
         }
 
         for (const archivo of fotosPendientes) {
@@ -552,6 +578,14 @@ export function PropiedadesListPage() {
   };
   const eliminarProveedorConfirmar = useConfirmarEliminar<string>(handleDeleteProveedor);
 
+  // Candidatas a "propiedad madre": nunca otra pieza, ni la propiedad que se
+  // está editando (no puede ser madre de sí misma).
+  const propiedadesPadreDisponibles = propiedades.filter(
+    (p) => !p.propiedadPadreId && p.id !== editingId,
+  );
+  const esPiezaForm = TIPOS_PIEZA.includes(form.tipo);
+  const propiedadPadreForm = propiedades.find((p) => p.id === form.propiedadPadreId);
+
   return (
     <div>
       <div className="page-header">
@@ -624,15 +658,44 @@ export function PropiedadesListPage() {
                 />
               </label>
             )}
-            {form.tipo === 'HABITACION' && (
-              <label>
-                Habitación
-                <input
-                  placeholder="1, 2, 3… o A, B, C…"
-                  value={form.numeroHabitacion}
-                  onChange={(e) => setForm({ ...form, numeroHabitacion: e.target.value })}
-                />
-              </label>
+            {TIPOS_PIEZA.includes(form.tipo) && (
+              <>
+                <label>
+                  {form.tipo === 'LOFT' ? 'Loft' : 'Habitación'}
+                  <input
+                    placeholder="1, 2, 3… o A, B, C…"
+                    value={form.numeroHabitacion}
+                    onChange={(e) => setForm({ ...form, numeroHabitacion: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Pertenece a
+                  <select
+                    required
+                    value={form.propiedadPadreId}
+                    onChange={(e) => {
+                      const padre = propiedadesPadreDisponibles.find((p) => p.id === e.target.value);
+                      setForm({
+                        ...form,
+                        propiedadPadreId: e.target.value,
+                        calle: padre?.calle ?? form.calle,
+                        numero: padre?.numero ?? form.numero,
+                        sector: padre?.sector ?? form.sector,
+                        ciudad: padre?.ciudad ?? form.ciudad,
+                        region: padre?.region ?? form.region,
+                      });
+                    }}
+                  >
+                    <option value="">Elige la casa/depto…</option>
+                    {propiedadesPadreDisponibles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.calle} {p.numero}
+                        {p.numeroDepartamento ? ` depto ${p.numeroDepartamento}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
             )}
             <label>
               Sector
@@ -1055,7 +1118,18 @@ export function PropiedadesListPage() {
             </fieldset>
           )}
 
-          {editingId && (
+          {editingId && esPiezaForm && (
+            <fieldset className="inline-form__fieldset">
+              <legend>Cuentas de proveedores</legend>
+              <p className="empty-state">
+                Esta {form.tipo === 'LOFT' ? 'loft' : 'habitación'} comparte las cuentas de agua/luz/gas
+                con {propiedadPadreForm ? `${propiedadPadreForm.calle} ${propiedadPadreForm.numero}` : 'su propiedad madre'}
+                . Adminístralas desde ahí.
+              </p>
+            </fieldset>
+          )}
+
+          {editingId && !esPiezaForm && (
             <fieldset className="inline-form__fieldset">
               <legend>Cuentas de proveedores</legend>
               {proveedores.length === 0 && (
@@ -1171,7 +1245,15 @@ export function PropiedadesListPage() {
             </fieldset>
           )}
 
-          {!editingId && (
+          {!editingId && esPiezaForm && form.propiedadPadreId && (
+            <p className="empty-state">
+              Esta {form.tipo === 'LOFT' ? 'loft' : 'habitación'} comparte las cuentas de agua/luz/gas con{' '}
+              {propiedadPadreForm ? `${propiedadPadreForm.calle} ${propiedadPadreForm.numero}` : 'su propiedad madre'}
+              .
+            </p>
+          )}
+
+          {!editingId && !esPiezaForm && (
             <fieldset className="inline-form__fieldset">
               <legend>Cuentas de proveedores (opcional)</legend>
               <div className="inline-form__grid">
@@ -1285,7 +1367,7 @@ export function PropiedadesListPage() {
               </tr>
             </thead>
             <tbody>
-              {propiedadesOrdenadas.map((propiedad) => (
+              {propiedadesAgrupadas.map((propiedad) => (
                   <tr key={propiedad.id}>
                     <td
                       className="cell-editable"
@@ -1307,10 +1389,11 @@ export function PropiedadesListPage() {
                         propiedad.rol
                       )}
                     </td>
-                    <td>
+                    <td style={propiedad.propiedadPadreId ? { paddingLeft: '1.75rem' } : undefined}>
+                      {propiedad.propiedadPadreId ? '↳ ' : ''}
                       {propiedad.calle} {propiedad.numero}
                       {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
-                      {propiedad.numeroHabitacion ? ` hab. ${propiedad.numeroHabitacion}` : ''}
+                      {propiedad.numeroHabitacion ? ` ${propiedad.tipo === 'LOFT' ? 'loft' : 'hab.'} ${propiedad.numeroHabitacion}` : ''}
                     </td>
                     <td>
                       {propiedad.sector ? `${propiedad.sector}, ` : ''}

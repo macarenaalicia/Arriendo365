@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { CreateProveedorDto } from './dto/create-proveedor.dto';
@@ -19,10 +19,17 @@ export class ProveedorService {
     if (!propiedad) {
       throw new NotFoundException('Propiedad no encontrada');
     }
+
+    return propiedad;
   }
 
   async create(propiedadId: string, dto: CreateProveedorDto) {
-    await this.assertPropiedadEnOrganizacion(propiedadId);
+    const propiedad = await this.assertPropiedadEnOrganizacion(propiedadId);
+    if (propiedad.propiedadPadreId) {
+      throw new ConflictException(
+        'Esta propiedad comparte proveedores con su propiedad madre: regístralos ahí.',
+      );
+    }
 
     return this.prisma.proveedor.create({
       data: { ...dto, propiedadId },
