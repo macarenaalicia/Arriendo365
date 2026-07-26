@@ -182,9 +182,9 @@ function calcularEstadoCelda(
 
   if (delMes.length === 0) {
     // Mes futuro sin nada pagado todavía: no vencido, no hay nada que
-    // mostrar — pero sigue siendo clickeable para adelantar un pago (ver
-    // "esNa" en el render, que solo deshabilita los meses previos a la
-    // fecha de entrega, no los futuros).
+    // mostrar — pero sigue siendo clickeable para adelantar un pago (el
+    // render solo deshabilita los meses previos a la fecha de entrega, no
+    // los futuros).
     if (mesKey > mesActualKey) return 'na';
     if (mesKey === mesActualKey && diaPago !== null) {
       // Si el día de pago pactado (ej. 31) no existe en este mes (ej.
@@ -209,6 +209,22 @@ function calcularEstadoCelda(
  * falta una de las dos, "incompleto"; si no hay ninguna y el mes ya pasó,
  * "atrasado".
  */
+type EstadoServicioTipo = 'pagado' | 'pendiente' | 'falta';
+
+function estadoServicioTipoMes(
+  pagosDelArriendo: Pago[],
+  mesKey: string,
+  tipo: TipoProveedor,
+): EstadoServicioTipo {
+  const delMes = pagosDelArriendo.filter(
+    (p) =>
+      p.tipoServicio === tipo && p.fechaComprometida.slice(0, 7) === mesKey && p.estado !== 'RECHAZADO',
+  );
+  if (delMes.length === 0) return 'falta';
+  if (delMes.some((p) => p.aprobado === null)) return 'pendiente';
+  return 'pagado';
+}
+
 function calcularEstadoCeldaServicios(
   mesKey: string,
   fechaEntrega: string,
@@ -219,24 +235,16 @@ function calcularEstadoCeldaServicios(
   const mesActualKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 
   if (mesKey < mesEntregaKey) return 'na';
-  if (mesKey > mesActualKey) return 'na';
 
-  const estadoTipo = (tipo: TipoProveedor): 'pagado' | 'pendiente' | 'falta' => {
-    const delMes = pagosDelArriendo.filter(
-      (p) =>
-        p.tipoServicio === tipo && p.fechaComprometida.slice(0, 7) === mesKey && p.estado !== 'RECHAZADO',
-    );
-    if (delMes.length === 0) return 'falta';
-    if (delMes.some((p) => p.aprobado === null)) return 'pendiente';
-    return 'pagado';
-  };
-
-  const agua = estadoTipo('AGUA');
-  const luz = estadoTipo('LUZ');
+  const agua = estadoServicioTipoMes(pagosDelArriendo, mesKey, 'AGUA');
+  const luz = estadoServicioTipoMes(pagosDelArriendo, mesKey, 'LUZ');
 
   if (agua === 'pagado' && luz === 'pagado') return 'pagado';
   if (agua === 'pendiente' || luz === 'pendiente') return 'pendiente';
   if (agua === 'falta' && luz === 'falta') {
+    // Mes futuro sin nada pagado: no vencido — pero clickeable para
+    // adelantar, igual que en Propiedades/Auto.
+    if (mesKey > mesActualKey) return 'na';
     return mesKey === mesActualKey ? 'pendiente' : 'atrasado';
   }
   return 'incompleto';
@@ -298,6 +306,19 @@ export function PagosResumenPage() {
   });
   const [pagoRapidoError, setPagoRapidoError] = useState<string | null>(null);
   const [guardandoPagoRapido, setGuardandoPagoRapido] = useState(false);
+
+  const [celdaServiciosSeleccionada, setCeldaServiciosSeleccionada] = useState<{
+    fila: FilaMatriz;
+    mesKey: string;
+  } | null>(null);
+  const [servicioForm, setServicioForm] = useState<
+    Record<'AGUA' | 'LUZ', { fecha: string; monto: string }>
+  >({
+    AGUA: { fecha: '', monto: '' },
+    LUZ: { fecha: '', monto: '' },
+  });
+  const [servicioError, setServicioError] = useState<string | null>(null);
+  const [guardandoServicio, setGuardandoServicio] = useState<TipoProveedor | null>(null);
 
   const [tabTipo, setTabTipo] = useState<TabPagos>('propiedad');
   const [vista, setVista] = useState<Vista>('default');
@@ -542,6 +563,62 @@ export function PagosResumenPage() {
     }
   };
 
+  const abrirPagoRapidoServicios = (fila: FilaMatriz, mesKey: string) => {
+    setCeldaServiciosSeleccionada({ fila, mesKey });
+    setServicioForm({
+      AGUA: { fecha: hoyDdmmyyyy(), monto: '' },
+      LUZ: { fecha: hoyDdmmyyyy(), monto: '' },
+    });
+    setServicioError(null);
+  };
+
+  const cerrarPagoRapidoServicios = () => {
+    setCeldaServiciosSeleccionada(null);
+    setServicioError(null);
+  };
+
+  const handleGuardarServicio = async (tipo: 'AGUA' | 'LUZ') => {
+    if (!celdaServiciosSeleccionada) return;
+    setServicioError(null);
+
+    const form = servicioForm[tipo];
+    const fechaPago = ddmmyyyyToIso(form.fecha);
+    if (!fechaPago) {
+      setServicioError('Fecha inválida, usa el formato dd/mm/aaaa.');
+      return;
+    }
+    const monto = Number(form.monto);
+    if (!monto || monto <= 0) {
+      setServicioError('Ingresa un monto válido.');
+      return;
+    }
+
+    const arriendoId = celdaServiciosSeleccionada.fila.key.replace(/^propiedad-/, '');
+    const fechaComprometida = periodoValorAFecha(
+      celdaServiciosSeleccionada.mesKey,
+      celdaServiciosSeleccionada.fila.diaPago ?? 1,
+    );
+
+    setGuardandoServicio(tipo);
+    try {
+      await api.post('/pagos', {
+        arriendoTipo: 'propiedad',
+        arriendoId,
+        periodo: fechaPago,
+        fechaComprometida,
+        monto,
+        categoria: 'SERVICIOS_BASICOS',
+        tipoServicio: tipo,
+      });
+      cargarPagos();
+      setServicioForm((prev) => ({ ...prev, [tipo]: { fecha: hoyDdmmyyyy(), monto: '' } }));
+    } catch (err) {
+      setServicioError(err instanceof ApiError ? err.message : 'No se pudo registrar el pago');
+    } finally {
+      setGuardandoServicio(null);
+    }
+  };
+
   if (loading) return <p>Cargando…</p>;
   if (error) return <p className="error-text">{error}</p>;
   if (!resumen) return null;
@@ -639,13 +716,15 @@ export function PagosResumenPage() {
   const hoy = new Date();
 
   const handleClickCelda = (fila: FilaMatriz, mesKey: string, estadoCelda: EstadoCelda) => {
-    // Servicios básicos no tiene pago rápido: agua y luz son dos boletas
-    // separadas, sin un "monto esperado" único que autocompletar. Ya
-    // pagado tampoco: no hay nada que registrar. En esos casos solo filtra
-    // el detalle de abajo para revisarlo.
-    if (tabTipo === 'servicios' || estadoCelda === 'pagado') {
+    // Ya pagado: no hay nada que registrar, solo filtra el detalle de abajo
+    // para revisarlo.
+    if (estadoCelda === 'pagado') {
       setVista('todos');
       setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label, periodoPagoMes: mesKey });
+      return;
+    }
+    if (tabTipo === 'servicios') {
+      abrirPagoRapidoServicios(fila, mesKey);
       return;
     }
     abrirPagoRapido(fila, mesKey);
@@ -843,14 +922,11 @@ export function PagosResumenPage() {
                                   fila.diaPago,
                                 );
                           const config = CELDA_CONFIG[estadoCelda];
-                          const esNa = estadoCelda === 'na';
                           // Un mes futuro sin pagos también sale "na" (nada
                           // que mostrar), pero a diferencia de un mes previo
                           // a la fecha de entrega, sí se puede usar para
-                          // adelantar un pago — solo Servicios básicos (sin
-                          // pago rápido) sigue deshabilitando todo "na".
-                          const antesDeEntrega = mes.key < fila.fechaEntrega.slice(0, 7);
-                          const deshabilitada = tabTipo === 'servicios' ? esNa : antesDeEntrega;
+                          // adelantar un pago.
+                          const deshabilitada = mes.key < fila.fechaEntrega.slice(0, 7);
                           return (
                             <td key={mes.key}>
                               <button
@@ -885,7 +961,7 @@ export function PagosResumenPage() {
               </div>
               <p className="empty-state">
                 {tabTipo === 'servicios'
-                  ? 'Haz clic en un ícono para ver el detalle de ese mes abajo.'
+                  ? 'Haz clic en un ícono para registrar el pago de agua/luz de ese mes — incluye meses futuros, por si quieres adelantar uno. Si ya está todo pagado, muestra el detalle abajo.'
                   : 'Haz clic en un ícono para registrar el pago de ese mes — incluye meses futuros, por si quieres adelantar uno. Si ya está pagado, muestra el detalle abajo.'}
               </p>
             </>
@@ -1008,6 +1084,102 @@ export function PagosResumenPage() {
               {pagoRapidoError && <p className="auth-card__error">{pagoRapidoError}</p>}
             </form>
           )}
+        </Modal>
+      )}
+
+      {celdaServiciosSeleccionada && (
+        <Modal
+          titulo={`${celdaServiciosSeleccionada.fila.label} — ${labelMes(celdaServiciosSeleccionada.mesKey)}`}
+          onClose={cerrarPagoRapidoServicios}
+        >
+          <div className="inline-form">
+            {(['AGUA', 'LUZ'] as const).map((tipo) => {
+              const pagosTipoMes = celdaServiciosSeleccionada.fila.pagos.filter(
+                (p) =>
+                  p.tipoServicio === tipo &&
+                  p.fechaComprometida.slice(0, 7) === celdaServiciosSeleccionada.mesKey &&
+                  p.estado !== 'RECHAZADO',
+              );
+              const pendiente = pagosTipoMes.find((p) => p.aprobado === null) ?? null;
+              const pagado = pagosTipoMes.find((p) => p.aprobado !== null) ?? null;
+
+              return (
+                <fieldset key={tipo} className="inline-form__fieldset">
+                  <legend>{TIPO_SERVICIO_LABELS[tipo]}</legend>
+                  {pendiente ? (
+                    <>
+                      <p>
+                        Hay un abono de {formatMonto(pendiente.monto)} reportado por el arrendatario,
+                        pendiente de aprobar.
+                      </p>
+                      <div className="table__actions">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAprobar(pendiente.id);
+                            cerrarPagoRapidoServicios();
+                          }}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => {
+                            handleRechazar(pendiente.id);
+                            cerrarPagoRapidoServicios();
+                          }}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </>
+                  ) : pagado ? (
+                    <p>
+                      <span className="celda-pago celda-pago--pagado" style={{ marginRight: '0.5rem' }}>
+                        <IconCheck />
+                      </span>
+                      Pagada — {formatMonto(pagado.monto)}
+                    </p>
+                  ) : (
+                    <div className="inline-form__grid">
+                      <label>
+                        Fecha de pago
+                        <DateInput
+                          value={servicioForm[tipo].fecha}
+                          onChange={(value) =>
+                            setServicioForm({ ...servicioForm, [tipo]: { ...servicioForm[tipo], fecha: value } })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Monto
+                        <input
+                          type="number"
+                          min={0}
+                          value={servicioForm[tipo].monto}
+                          onChange={(e) =>
+                            setServicioForm({
+                              ...servicioForm,
+                              [tipo]: { ...servicioForm[tipo], monto: e.target.value },
+                            })
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={guardandoServicio === tipo}
+                        onClick={() => handleGuardarServicio(tipo)}
+                      >
+                        {guardandoServicio === tipo ? 'Guardando…' : `✓ Marcar ${TIPO_SERVICIO_LABELS[tipo]} como pagada`}
+                      </button>
+                    </div>
+                  )}
+                </fieldset>
+              );
+            })}
+            {servicioError && <p className="auth-card__error">{servicioError}</p>}
+          </div>
         </Modal>
       )}
 
