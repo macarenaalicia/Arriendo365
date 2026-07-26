@@ -194,14 +194,24 @@ export function PersonasListPage() {
     setAccesoForm(
       usuario ? { rol: usuario.rol, activo: usuario.activo, password: '' } : ACCESO_FORM_INICIAL,
     );
-    if (usuario && usuario.rol === 'ADMINISTRADOR') {
-      if (propiedades.length === 0) api.get<Propiedad[]>('/propiedades').then(setPropiedades);
-      if (autos.length === 0) api.get<Auto[]>('/autos').then(setAutos);
+  };
+
+  // La lista de propiedades/autos para marcar (y los bienes ya asignados) se
+  // cargan apenas el rol elegido en el formulario es ADMINISTRADOR, no solo
+  // al abrir el modal — si el usuario recién elige ese rol (nuevo acceso o
+  // al promover a alguien que tenía otro rol) igual debe ver algo que marcar.
+  useEffect(() => {
+    if (!accesoPersonaId || accesoForm.rol !== 'ADMINISTRADOR') return;
+    if (propiedades.length === 0) api.get<Propiedad[]>('/propiedades').then(setPropiedades);
+    if (autos.length === 0) api.get<Auto[]>('/autos').then(setAutos);
+    const usuario = usuarios.find((u) => u.personaId === accesoPersonaId);
+    if (usuario) {
       api
         .get<{ propiedadIds: string[]; autoIds: string[] }>(`/usuarios/${usuario.id}/bienes`)
         .then(setBienesForm);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accesoPersonaId, accesoForm.rol]);
 
   const cerrarAcceso = () => {
     setAccesoPersonaId(null);
