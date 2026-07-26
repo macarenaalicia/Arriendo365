@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 
@@ -26,6 +27,7 @@ export class UsuarioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   private async assertPersonaEnOrganizacion(personaId: string) {
@@ -39,6 +41,7 @@ export class UsuarioService {
   }
 
   async create(dto: CreateUsuarioDto) {
+    await this.administradorBien.assertAccesoCompleto();
     const persona = await this.assertPersonaEnOrganizacion(dto.personaId);
 
     if (persona.tipoPersona === 'TECNICO' || persona.tipoPersona === 'CODEUDOR') {
@@ -68,7 +71,8 @@ export class UsuarioService {
     });
   }
 
-  findAll() {
+  async findAll() {
+    await this.administradorBien.assertAccesoCompleto();
     return this.prisma.usuario.findMany({
       where: { organizacionId: this.tenant.organizacionId },
       select: SELECT_SIN_PASSWORD,
@@ -77,6 +81,7 @@ export class UsuarioService {
   }
 
   async findOne(id: string) {
+    await this.administradorBien.assertAccesoCompleto();
     const usuario = await this.prisma.usuario.findFirst({
       where: { id, organizacionId: this.tenant.organizacionId },
       select: SELECT_SIN_PASSWORD,

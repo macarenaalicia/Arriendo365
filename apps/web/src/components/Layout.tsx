@@ -4,10 +4,13 @@ import { useAuth } from '../auth/AuthContext';
 import { IconLogoRayo } from './icons';
 
 export function Layout() {
-  const { logout, rol, nombreCompleto } = useAuth();
+  const { logout, rol, nombreCompleto, bienesRestringidos } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const esArrendatario = rol === 'ARRENDATARIO';
+  // Personas/Usuarios abarcan a toda la organización: solo el propietario y
+  // un administrador sin bienes acotados deben verlos.
+  const puedeVerPersonas = !esArrendatario && rol !== 'TECNICO' && !bienesRestringidos;
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [bienesAbierto, setBienesAbierto] = useState(false);
   const bienesActivo =
@@ -65,7 +68,7 @@ export function Layout() {
               )}
             </div>
           )}
-          {!esArrendatario && <NavLink to="/personas">Personas</NavLink>}
+          {puedeVerPersonas && <NavLink to="/personas">Personas</NavLink>}
         </nav>
 
         <div className="user-menu">

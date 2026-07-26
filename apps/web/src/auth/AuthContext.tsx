@@ -15,6 +15,7 @@ interface AuthContextValue {
   usuarioId: string | null;
   nombreCompleto: string | null;
   debeCambiarPassword: boolean;
+  bienesRestringidos: boolean;
   marcarPasswordCambiada: () => void;
   login: (email: string, password: string) => Promise<void>;
   registrarOrganizacion: (dto: {
@@ -59,12 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => datosDesdeToken(getToken()).nombreCompleto,
   );
   const [debeCambiarPassword, setDebeCambiarPassword] = useState(false);
+  const [bienesRestringidos, setBienesRestringidos] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     api
-      .get<{ debeCambiarPassword: boolean }>('/perfil')
-      .then((perfil) => setDebeCambiarPassword(perfil.debeCambiarPassword))
+      .get<{ debeCambiarPassword: boolean; bienesRestringidos: boolean }>('/perfil')
+      .then((perfil) => {
+        setDebeCambiarPassword(perfil.debeCambiarPassword);
+        setBienesRestringidos(perfil.bienesRestringidos);
+      })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
@@ -103,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuarioId(null);
     setNombreCompleto(null);
     setDebeCambiarPassword(false);
+    setBienesRestringidos(false);
   };
 
   return (
@@ -114,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         usuarioId,
         nombreCompleto,
         debeCambiarPassword,
+        bienesRestringidos,
         marcarPasswordCambiada,
         login,
         registrarOrganizacion,

@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { RolUsuario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
 import { CreatePersonaDto } from './dto/create-persona.dto';
 import { UpdatePersonaDto } from './dto/update-persona.dto';
 
@@ -19,9 +20,11 @@ export class PersonaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   async create(dto: CreatePersonaDto) {
+    await this.administradorBien.assertAccesoCompleto();
     const { recomendaciones, ...datos } = dto;
 
     if (dto.rut) {
@@ -83,6 +86,7 @@ export class PersonaService {
   }
 
   async update(id: string, dto: UpdatePersonaDto) {
+    await this.administradorBien.assertAccesoCompleto();
     const actual = await this.findOne(id);
     const { recomendaciones: _recomendaciones, ...datos } = dto;
     const organizacionId = this.tenant.organizacionId;
@@ -121,6 +125,7 @@ export class PersonaService {
   }
 
   async remove(id: string) {
+    await this.administradorBien.assertAccesoCompleto();
     await this.findOne(id);
 
     const tieneArriendos = await this.prisma.arriendoPropiedad.findFirst({

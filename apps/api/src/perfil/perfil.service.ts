@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/co
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
 import { CambiarPasswordDto } from './dto/cambiar-password.dto';
 import { ActualizarPerfilDto } from './dto/actualizar-perfil.dto';
 
@@ -12,6 +13,7 @@ export class PerfilService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   async obtenerPerfil() {
@@ -25,6 +27,7 @@ export class PerfilService {
       where: { id: this.tenant.usuarioId },
       select: { debeCambiarPassword: true },
     });
+    const { propiedadIds, autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
 
     return {
       nombreCompleto: persona.nombreCompleto,
@@ -33,6 +36,10 @@ export class PerfilService {
       telefono: persona.telefono,
       rol: this.tenant.rol,
       debeCambiarPassword: usuario?.debeCambiarPassword ?? false,
+      // Un administrador acotado a bienes puntuales no debe ver Personas ni
+      // Usuarios (esa vista abarca toda la organización) — el frontend usa
+      // esto para ocultar el link de navegación y las acciones asociadas.
+      bienesRestringidos: propiedadIds !== null || autoIds !== null,
     };
   }
 

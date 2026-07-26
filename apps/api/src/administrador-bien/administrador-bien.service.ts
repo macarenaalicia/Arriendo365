@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { AsignarBienesDto } from './dto/asignar-bienes.dto';
@@ -29,7 +29,21 @@ export class AdministradorBienService {
     return usuario;
   }
 
+  /**
+   * Personas/Usuarios abarcan a toda la organización — un administrador
+   * acotado a bienes puntuales no debe verlos ni gestionarlos, aunque sí
+   * pueda seguir viendo la lista de personas para elegir arrendatario/
+   * codeudor al crear un arriendo dentro de sus propios bienes.
+   */
+  async assertAccesoCompleto() {
+    const { propiedadIds, autoIds } = await this.getFiltroBienesUsuarioActual();
+    if (propiedadIds !== null || autoIds !== null) {
+      throw new ForbiddenException('No tienes acceso a esta sección');
+    }
+  }
+
   async listarPorUsuario(usuarioId: string) {
+    await this.assertAccesoCompleto();
     await this.assertUsuarioAdministrador(usuarioId);
     const filas = await this.prisma.administradorBien.findMany({ where: { usuarioId } });
     return {
@@ -39,6 +53,7 @@ export class AdministradorBienService {
   }
 
   async asignar(usuarioId: string, dto: AsignarBienesDto) {
+    await this.assertAccesoCompleto();
     await this.assertUsuarioAdministrador(usuarioId);
 
     await this.prisma.$transaction([

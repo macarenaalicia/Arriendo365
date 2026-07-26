@@ -4,7 +4,7 @@ import { AdministradorBienService } from './administrador-bien.service';
 import { AsignarBienesDto } from './dto/asignar-bienes.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 
-@Roles(RolUsuario.ADMINISTRADOR)
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO)
 @Controller('usuarios/:usuarioId/bienes')
 export class AdministradorBienController {
   constructor(private readonly administradorBienService: AdministradorBienService) {}

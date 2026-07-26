@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import type { Auto, PerfilPersona, Persona, Propiedad, RolUsuario, Usuario } from '../api/types';
 import { ddmmyyyyToIso, isoToDdmmyyyy, sufijoUnidadPropiedad } from '../lib/format';
 import { esRutValido } from '../lib/rut';
@@ -60,6 +62,7 @@ const ACCESO_FORM_INICIAL = {
 };
 
 export function PersonasListPage() {
+  const { rol, bienesRestringidos } = useAuth();
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
   const tour = useOnboardingTour('personas');
@@ -310,6 +313,13 @@ export function PersonasListPage() {
     if (!usuario || usuario.activo) return true;
     return mostrarInactivos;
   });
+
+  // Personas/Usuarios abarcan a toda la organización: solo el propietario y
+  // un administrador sin bienes acotados deben verlos (mismo criterio que
+  // Layout oculta el link, esto cubre a quien navegue directo a la URL).
+  if (rol === 'TECNICO' || bienesRestringidos) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div>

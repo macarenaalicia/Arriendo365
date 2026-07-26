@@ -15,7 +15,7 @@ import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 
-@Roles(RolUsuario.ADMINISTRADOR)
+@Roles(RolUsuario.ADMINISTRADOR, RolUsuario.PROPIETARIO)
 @Controller('usuarios')
 export class UsuarioController {
   constructor(private readonly usuarioService: UsuarioService) {}
