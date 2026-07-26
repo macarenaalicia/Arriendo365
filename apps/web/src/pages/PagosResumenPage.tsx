@@ -293,7 +293,9 @@ export function PagosResumenPage() {
   const [arriendosPropiedad, setArriendosPropiedad] = useState<ArriendoPropiedad[]>([]);
   const [arriendosAuto, setArriendosAuto] = useState<ArriendoAuto[]>([]);
   const [anioMatriz, setAnioMatriz] = useState(new Date().getFullYear());
-  const [filtroTagCelda, setFiltroTagCelda] = useState<{ autoId: string; mesKey: string } | null>(null);
+  const [filtroTagCelda, setFiltroTagCelda] = useState<{ autoId?: string; mesKey?: string } | null>(
+    null,
+  );
 
   const [celdaSeleccionada, setCeldaSeleccionada] = useState<{ fila: FilaMatriz; mesKey: string } | null>(
     null,
@@ -644,11 +646,8 @@ export function PagosResumenPage() {
 
   const tagPagos = pagosVehiculo
     .filter((p) => p.tipo === 'TAG')
-    .filter(
-      (p) =>
-        !filtroTagCelda ||
-        (p.autoId === filtroTagCelda.autoId && p.fechaPago.slice(0, 7) === filtroTagCelda.mesKey),
-    )
+    .filter((p) => !filtroTagCelda?.autoId || p.autoId === filtroTagCelda.autoId)
+    .filter((p) => !filtroTagCelda?.mesKey || p.fechaPago.slice(0, 7) === filtroTagCelda.mesKey)
     .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
 
   const mantencionesTab = [...mantenciones].sort((a, b) =>
@@ -730,8 +729,29 @@ export function PagosResumenPage() {
     abrirPagoRapido(fila, mesKey);
   };
 
+  // Clic en el nombre de la fila: todos los pagos de esa propiedad/auto,
+  // cualquier mes. Clic en el encabezado de un mes: los pagos de ese mes,
+  // de cualquier propiedad/auto.
+  const handleClickNombreFila = (fila: FilaMatriz) => {
+    setVista('todos');
+    setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label });
+  };
+
+  const handleClickMesEncabezado = (mesKey: string) => {
+    setVista('todos');
+    setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, periodoPagoMes: mesKey });
+  };
+
   const handleClickCeldaTag = (fila: FilaMatrizTag, mesKey: string) => {
     setFiltroTagCelda({ autoId: fila.key.replace('auto-', ''), mesKey });
+  };
+
+  const handleClickNombreFilaTag = (fila: FilaMatrizTag) => {
+    setFiltroTagCelda({ autoId: fila.key.replace('auto-', '') });
+  };
+
+  const handleClickMesEncabezadoTag = (mesKey: string) => {
+    setFiltroTagCelda({ mesKey });
   };
 
   const resumenTab = ESTADOS_PAGO.reduce(
@@ -844,14 +864,32 @@ export function PagosResumenPage() {
                       <tr>
                         <th>Auto</th>
                         {mesesMatriz.map((mes) => (
-                          <th key={mes.key}>{mes.label}</th>
+                          <th key={mes.key}>
+                            <button
+                              type="button"
+                              className="link-button"
+                              title={`Ver todos los cobros de TAG de ${mes.label}`}
+                              onClick={() => handleClickMesEncabezadoTag(mes.key)}
+                            >
+                              {mes.label}
+                            </button>
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {filasMatrizTag.map((fila) => (
                         <tr key={fila.key}>
-                          <td>{fila.link ? <Link to={fila.link}>{fila.label}</Link> : fila.label}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="link-button"
+                              title={`Ver todos los cobros de TAG de ${fila.label}`}
+                              onClick={() => handleClickNombreFilaTag(fila)}
+                            >
+                              {fila.label}
+                            </button>
+                          </td>
                           {mesesMatriz.map((mes) => {
                             const estadoCelda = calcularEstadoCeldaTag(mes.key, fila.pagosVehiculo);
                             const config = CELDA_CONFIG[estadoCelda];
@@ -901,14 +939,32 @@ export function PagosResumenPage() {
                     <tr>
                       <th>{tabTipo === 'auto' ? 'Auto' : 'Propiedad'}</th>
                       {mesesMatriz.map((mes) => (
-                        <th key={mes.key}>{mes.label}</th>
+                        <th key={mes.key}>
+                          <button
+                            type="button"
+                            className="link-button"
+                            title={`Ver todos los pagos de ${mes.label}`}
+                            onClick={() => handleClickMesEncabezado(mes.key)}
+                          >
+                            {mes.label}
+                          </button>
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filasMatriz.map((fila) => (
                       <tr key={fila.key}>
-                        <td>{fila.link ? <Link to={fila.link}>{fila.label}</Link> : fila.label}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="link-button"
+                            title={`Ver todos los pagos de ${fila.label}`}
+                            onClick={() => handleClickNombreFila(fila)}
+                          >
+                            {fila.label}
+                          </button>
+                        </td>
                         {mesesMatriz.map((mes) => {
                           const estadoCelda =
                             tabTipo === 'servicios'
@@ -1203,16 +1259,20 @@ export function PagosResumenPage() {
             <h2>TAG</h2>
             {filtroTagCelda && (
               <button type="button" className="link-button" onClick={() => setFiltroTagCelda(null)}>
-                Quitar filtro ({autoLabel(filtroTagCelda.autoId)},{' '}
-                {labelMes(filtroTagCelda.mesKey)})
+                Quitar filtro (
+                {[
+                  filtroTagCelda.autoId ? autoLabel(filtroTagCelda.autoId) : null,
+                  filtroTagCelda.mesKey ? labelMes(filtroTagCelda.mesKey) : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+                )
               </button>
             )}
           </div>
           {tagPagos.length === 0 ? (
             <p className="empty-state">
-              {filtroTagCelda
-                ? 'Sin cobros de TAG para ese auto en ese mes.'
-                : 'Sin cobros de TAG registrados.'}
+              {filtroTagCelda ? 'Sin cobros de TAG que coincidan con el filtro.' : 'Sin cobros de TAG registrados.'}
             </p>
           ) : (
             <div className="table-wrap">
