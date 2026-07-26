@@ -159,6 +159,22 @@ const CELDA_CONFIG: Record<EstadoCelda, { clase: string; icono: React.ReactNode;
   na: { clase: 'celda-pago--na', icono: '—', titulo: 'No aplica este mes' },
 };
 
+/** Lista de "YYYY-MM" desde `desdeKey` (incluido) hasta `hastaKeyExclusive` (excluido). */
+function mesesEntre(desdeKey: string, hastaKeyExclusive: string): string[] {
+  const meses: string[] = [];
+  let [y, m] = desdeKey.split('-').map(Number);
+  const [yHasta, mHasta] = hastaKeyExclusive.split('-').map(Number);
+  while (y < yHasta || (y === yHasta && m < mHasta)) {
+    meses.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return meses;
+}
+
 /**
  * Estado de un mes de arriendo para la matriz simplificada. Se basa en si
  * hay pagos registrados ese mes (fechaComprometida), no en un campo
@@ -301,9 +317,11 @@ export function PagosResumenPage() {
     null,
   );
 
-  const [celdaSeleccionada, setCeldaSeleccionada] = useState<{ fila: FilaMatriz; mesKey: string } | null>(
-    null,
-  );
+  const [celdaSeleccionada, setCeldaSeleccionada] = useState<{
+    fila: FilaMatriz;
+    mesKey: string;
+    mesClickeado?: string;
+  } | null>(null);
   const [pagoRapidoForm, setPagoRapidoForm] = useState({
     fecha: '',
     medioPago: '',
@@ -316,6 +334,7 @@ export function PagosResumenPage() {
   const [celdaServiciosSeleccionada, setCeldaServiciosSeleccionada] = useState<{
     fila: FilaMatriz;
     mesKey: string;
+    mesClickeado?: string;
   } | null>(null);
   const [servicioForm, setServicioForm] = useState<
     Record<'AGUA' | 'LUZ', { fecha: string; monto: string }>
@@ -502,8 +521,12 @@ export function PagosResumenPage() {
     setPagoRapidoError(null);
   };
 
-  const abrirPagoRapido = (fila: FilaMatriz, mesKey: string) => {
-    setCeldaSeleccionada({ fila, mesKey });
+  const abrirPagoRapido = (fila: FilaMatriz, mesKey: string, mesClickeado?: string) => {
+    setCeldaSeleccionada({
+      fila,
+      mesKey,
+      mesClickeado: mesClickeado && mesClickeado !== mesKey ? mesClickeado : undefined,
+    });
     setPagoRapidoForm({ fecha: hoyDdmmyyyy(), medioPago: '', esAbono: false, monto: '' });
     setPagoRapidoError(null);
   };
@@ -570,8 +593,12 @@ export function PagosResumenPage() {
     }
   };
 
-  const abrirPagoRapidoServicios = (fila: FilaMatriz, mesKey: string) => {
-    setCeldaServiciosSeleccionada({ fila, mesKey });
+  const abrirPagoRapidoServicios = (fila: FilaMatriz, mesKey: string, mesClickeado?: string) => {
+    setCeldaServiciosSeleccionada({
+      fila,
+      mesKey,
+      mesClickeado: mesClickeado && mesClickeado !== mesKey ? mesClickeado : undefined,
+    });
     setServicioForm({
       AGUA: { fecha: hoyDdmmyyyy(), monto: '' },
       LUZ: { fecha: hoyDdmmyyyy(), monto: '' },
@@ -719,6 +746,20 @@ export function PagosResumenPage() {
 
   const hoy = new Date();
 
+  // Un abono paga primero la deuda más antigua: si el mes clickeado no es el
+  // más antiguo con saldo pendiente de esa fila, se redirige el pago rápido
+  // a ese mes anterior — así nunca queda un mes sin pagar con otro más
+  // nuevo ya marcado "pagado".
+  const mesMasAntiguoPendiente = (fila: FilaMatriz, mesKey: string, esServicios: boolean): string | null => {
+    for (const mes of mesesEntre(fila.fechaEntrega.slice(0, 7), mesKey)) {
+      const estado = esServicios
+        ? calcularEstadoCeldaServicios(mes, fila.fechaEntrega, fila.pagos, hoy)
+        : calcularEstadoCelda(mes, fila.fechaEntrega, fila.montoArriendo, fila.pagos, hoy, fila.diaPago);
+      if (estado === 'atrasado' || estado === 'incompleto') return mes;
+    }
+    return null;
+  };
+
   const handleClickCelda = (fila: FilaMatriz, mesKey: string, estadoCelda: EstadoCelda) => {
     // Ya pagado: no hay nada que registrar, solo filtra el detalle de abajo
     // para revisarlo.
@@ -727,11 +768,13 @@ export function PagosResumenPage() {
       setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label, periodoPagoMes: mesKey });
       return;
     }
-    if (tabTipo === 'servicios') {
-      abrirPagoRapidoServicios(fila, mesKey);
+    const esServicios = tabTipo === 'servicios';
+    const mesDestino = mesMasAntiguoPendiente(fila, mesKey, esServicios) ?? mesKey;
+    if (esServicios) {
+      abrirPagoRapidoServicios(fila, mesDestino, mesKey);
       return;
     }
-    abrirPagoRapido(fila, mesKey);
+    abrirPagoRapido(fila, mesDestino, mesKey);
   };
 
   // Clic en el nombre de la fila: todos los pagos de esa propiedad/auto,
@@ -1035,6 +1078,12 @@ export function PagosResumenPage() {
           titulo={`${celdaSeleccionada.fila.label} — ${labelMes(celdaSeleccionada.mesKey)}`}
           onClose={cerrarPagoRapido}
         >
+          {celdaSeleccionada.mesClickeado && (
+            <p className="field-hint">
+              {labelMes(celdaSeleccionada.mesKey)} sigue con saldo pendiente, así que el pago se
+              aplica ahí primero (antes que {labelMes(celdaSeleccionada.mesClickeado)}).
+            </p>
+          )}
           {pagoPendienteAprobacion ? (
             <div className="inline-form">
               <p>
@@ -1153,6 +1202,12 @@ export function PagosResumenPage() {
           titulo={`${celdaServiciosSeleccionada.fila.label} — ${labelMes(celdaServiciosSeleccionada.mesKey)}`}
           onClose={cerrarPagoRapidoServicios}
         >
+          {celdaServiciosSeleccionada.mesClickeado && (
+            <p className="field-hint">
+              {labelMes(celdaServiciosSeleccionada.mesKey)} sigue con saldo pendiente, así que el
+              pago se aplica ahí primero (antes que {labelMes(celdaServiciosSeleccionada.mesClickeado)}).
+            </p>
+          )}
           <div className="inline-form">
             {(['AGUA', 'LUZ'] as const).map((tipo) => {
               const pagosTipoMes = celdaServiciosSeleccionada.fila.pagos.filter(
