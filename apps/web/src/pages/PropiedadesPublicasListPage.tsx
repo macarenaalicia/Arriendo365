@@ -62,7 +62,7 @@ export function PropiedadesPublicasListPage() {
               </h2>
               <p className="public-card__ubicacion">
                 {propiedad.sector ? `${propiedad.sector}, ` : ''}
-                {propiedad.ciudad}, {propiedad.region}
+                {propiedad.ciudad}
               </p>
               <p className="public-card__caracteristicas">
                 {propiedad.nHabitaciones} dorm. · {propiedad.nBanos} baños ·{' '}

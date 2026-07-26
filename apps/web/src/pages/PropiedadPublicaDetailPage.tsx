@@ -63,7 +63,7 @@ export function PropiedadPublicaDetailPage() {
       </div>
 
       <p className="public-card__ubicacion public-card__ubicacion--detalle">
-        {[propiedad.sector, propiedad.ciudad, propiedad.region].filter(Boolean).join(' · ')}
+        {[propiedad.sector, propiedad.ciudad].filter(Boolean).join(' · ')}
       </p>
 
       {propiedad.precioArriendoEsperado && (

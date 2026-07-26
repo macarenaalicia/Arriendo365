@@ -165,7 +165,7 @@ export function PropiedadesListPage() {
       case 'direccion':
         return `${propiedad.calle} ${propiedad.numero}`;
       case 'ubicacion':
-        return `${propiedad.ciudad} ${propiedad.region}`;
+        return `${propiedad.sector ?? ''} ${propiedad.ciudad}`;
       case 'tipo':
         return propiedad.tipo;
       case 'nHabitaciones':
@@ -1298,7 +1298,8 @@ export function PropiedadesListPage() {
                       {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
                     </td>
                     <td>
-                      {propiedad.ciudad}, {propiedad.region}
+                      {propiedad.sector ? `${propiedad.sector}, ` : ''}
+                      {propiedad.ciudad}
                     </td>
                     <td>
                       <select
