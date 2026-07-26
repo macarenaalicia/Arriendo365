@@ -721,6 +721,7 @@ export function ArriendosListPage() {
                   <td>
                     <Link to={`/arriendos/${arriendo.id}`}>
                       {arriendo.propiedad.calle} {arriendo.propiedad.numero}
+                      {sufijoUnidadPropiedad(arriendo.propiedad)}
                     </Link>
                   </td>
                   <td>{arriendo.arrendatario.nombreCompleto}</td>
