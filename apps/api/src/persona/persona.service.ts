@@ -94,6 +94,34 @@ export class PersonaService {
 
   async remove(id: string) {
     await this.findOne(id);
-    await this.prisma.persona.delete({ where: { id } });
+
+    const tieneArriendos = await this.prisma.arriendoPropiedad.findFirst({
+      where: { OR: [{ arrendatarioId: id }, { codeudorId: id }] },
+    });
+    if (tieneArriendos) {
+      throw new ConflictException(
+        'No se puede eliminar una persona que tiene arriendos de propiedad registrados.',
+      );
+    }
+
+    const tieneArriendosAuto = await this.prisma.arriendoAuto.findFirst({
+      where: { arrendatarioId: id },
+    });
+    if (tieneArriendosAuto) {
+      throw new ConflictException(
+        'No se puede eliminar una persona que tiene arriendos de auto registrados.',
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.personaRecomendacion.deleteMany({ where: { personaId: id } }),
+      this.prisma.requerimiento.updateMany({ where: { tecnicoId: id }, data: { tecnicoId: null } }),
+      this.prisma.requerimientoActualizacion.updateMany({
+        where: { tecnicoId: id },
+        data: { tecnicoId: null },
+      }),
+      this.prisma.usuario.deleteMany({ where: { personaId: id } }),
+      this.prisma.persona.delete({ where: { id } }),
+    ]);
   }
 }

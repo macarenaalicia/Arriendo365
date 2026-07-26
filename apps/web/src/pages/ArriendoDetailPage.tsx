@@ -6,6 +6,7 @@ import type {
   ArriendoPropiedad,
   CategoriaPago,
   Documento,
+  EstadoArriendo,
   EstadoPago,
   EstadoRequerimiento,
   Pago,
@@ -84,12 +85,16 @@ const TIPO_SERVICIO_LABELS: Record<TipoProveedor, string> = {
 
 const PERIODOS_ALZA = ['MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL', 'SIN REAJUSTE'] as const;
 
+const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
+
 const CONDICIONES_FORM_INICIAL = {
   montoArriendo: '',
   fechaPago: '',
   fechaEntrega: '',
   periodoAlza: 'ANUAL' as (typeof PERIODOS_ALZA)[number],
   ipcPorcentaje: '',
+  estado: 'ACTIVO' as EstadoArriendo,
+  fechaRecepcion: '',
 };
 
 const DOCUMENTO_TIPOS_ARRIENDO = [
@@ -292,6 +297,8 @@ export function ArriendoDetailPage() {
       fechaEntrega: isoToDdmmyyyy(arriendo.fechaEntrega),
       periodoAlza: arriendo.periodoAlza as (typeof PERIODOS_ALZA)[number],
       ipcPorcentaje: arriendo.ipcPorcentaje ?? '',
+      estado: arriendo.estado,
+      fechaRecepcion: arriendo.fechaRecepcion ? isoToDdmmyyyy(arriendo.fechaRecepcion) : '',
     });
     setCondicionesError(null);
     setShowCondicionesForm(true);
@@ -316,6 +323,10 @@ export function ArriendoDetailPage() {
         fechaEntrega,
         periodoAlza: condicionesForm.periodoAlza,
         ipcPorcentaje: condicionesForm.ipcPorcentaje ? Number(condicionesForm.ipcPorcentaje) : undefined,
+        estado: condicionesForm.estado,
+        fechaRecepcion: condicionesForm.fechaRecepcion
+          ? ddmmyyyyToIso(condicionesForm.fechaRecepcion)
+          : undefined,
       });
       cerrarCondicionesForm();
       cargarArriendo();
@@ -912,6 +923,35 @@ export function ArriendoDetailPage() {
                   }
                 />
               </label>
+              <label>
+                Estado
+                <select
+                  value={condicionesForm.estado}
+                  onChange={(e) =>
+                    setCondicionesForm({
+                      ...condicionesForm,
+                      estado: e.target.value as EstadoArriendo,
+                    })
+                  }
+                >
+                  {ESTADOS_ARRIENDO.map((estado) => (
+                    <option key={estado} value={estado}>
+                      {estado}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {condicionesForm.estado !== 'ACTIVO' && (
+                <label>
+                  Fecha de recepción de la propiedad
+                  <DateInput
+                    value={condicionesForm.fechaRecepcion}
+                    onChange={(value) =>
+                      setCondicionesForm({ ...condicionesForm, fechaRecepcion: value })
+                    }
+                  />
+                </label>
+              )}
             </div>
 
             {condicionesError && <p className="auth-card__error">{condicionesError}</p>}

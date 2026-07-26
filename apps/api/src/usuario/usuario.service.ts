@@ -107,6 +107,12 @@ export class UsuarioService {
 
   async remove(id: string) {
     await this.findOne(id);
-    await this.prisma.usuario.delete({ where: { id } });
+    await this.prisma.$transaction([
+      this.prisma.requerimientoActualizacion.updateMany({
+        where: { usuarioId: id },
+        data: { usuarioId: null },
+      }),
+      this.prisma.usuario.delete({ where: { id } }),
+    ]);
   }
 }
