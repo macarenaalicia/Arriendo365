@@ -341,12 +341,18 @@ export function PropiedadesListPage() {
         rol: form.rol,
         calle: form.calle,
         numero: form.numero,
+        // OJO: acá hay que mandar `null` y no `undefined` para los campos que
+        // no aplican — `undefined` se omite del JSON, así que en una edición
+        // (PATCH) el backend lo interpreta como "no cambiar" y deja el valor
+        // viejo pegado en la base si antes sí aplicaba (ver bug real: una
+        // casa que pasó por "pertenece a vecindad" con identificador y
+        // después se dejó independiente, quedaba con el identificador viejo).
         numeroDepartamento:
-          form.tipo === 'DEPARTAMENTO' && form.numeroDepartamento ? form.numeroDepartamento : undefined,
+          form.tipo === 'DEPARTAMENTO' && form.numeroDepartamento ? form.numeroDepartamento : null,
         numeroHabitacion:
           (esPieza || (esMadreOpcional && form.propiedadPadreId)) && form.numeroHabitacion
             ? form.numeroHabitacion
-            : undefined,
+            : null,
         propiedadPadreId: esPieza
           ? form.propiedadPadreId
           : esMadreOpcional && form.propiedadPadreId
