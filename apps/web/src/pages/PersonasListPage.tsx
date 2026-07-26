@@ -71,6 +71,7 @@ export function PersonasListPage() {
   const [mensaje, setMensaje] = useState<string | null>(null);
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [accesoPersonaId, setAccesoPersonaId] = useState<string | null>(null);
   const [accesoForm, setAccesoForm] = useState(ACCESO_FORM_INICIAL);
   const [accesoError, setAccesoError] = useState<string | null>(null);
@@ -281,13 +282,33 @@ export function PersonasListPage() {
   };
   const eliminarAcceso = useConfirmarEliminar<string>(handleQuitarAcceso);
 
+  // Un técnico o codeudor nunca tiene Usuario (no es "inactivo", es un
+  // perfil sin acceso por diseño) — solo se oculta a quien tuvo acceso y se
+  // le desactivó, para no perder de vista arrendatarios/administradores
+  // desactivados por error.
+  const personasVisibles = personas.filter((persona) => {
+    const usuario = usuarios.find((u) => u.personaId === persona.id);
+    if (!usuario || usuario.activo) return true;
+    return mostrarInactivos;
+  });
+
   return (
     <div>
       <div className="page-header">
         <h1>Personas</h1>
-        <button type="button" data-tour="personas-nueva" onClick={abrirCreacion}>
-          + Nueva persona
-        </button>
+        <div className="page-header__actions">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={mostrarInactivos}
+              onChange={(e) => setMostrarInactivos(e.target.checked)}
+            />
+            Mostrar personas con acceso desactivado
+          </label>
+          <button type="button" data-tour="personas-nueva" onClick={abrirCreacion}>
+            + Nueva persona
+          </button>
+        </div>
       </div>
 
       {mensaje && (
@@ -377,11 +398,15 @@ export function PersonasListPage() {
 
       {loading && <p>Cargando…</p>}
 
-      {!loading && personas.length === 0 && (
-        <p className="empty-state">Aún no has agregado personas.</p>
+      {!loading && personasVisibles.length === 0 && (
+        <p className="empty-state">
+          {personas.length === 0
+            ? 'Aún no has agregado personas.'
+            : 'No hay personas con acceso activo. Activa "Mostrar personas con acceso desactivado" para verlas.'}
+        </p>
       )}
 
-      {!loading && personas.length > 0 && (
+      {!loading && personasVisibles.length > 0 && (
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -396,9 +421,18 @@ export function PersonasListPage() {
               </tr>
             </thead>
             <tbody>
-              {personas.map((persona) => (
+              {personasVisibles.map((persona) => {
+                const usuario = usuarios.find((u) => u.personaId === persona.id);
+                return (
                 <tr key={persona.id}>
-                  <td>{persona.nombreCompleto}</td>
+                  <td>
+                    {persona.nombreCompleto}
+                    {usuario && !usuario.activo && (
+                      <span className="badge badge--rechazado" style={{ marginLeft: '0.5rem' }}>
+                        Acceso desactivado
+                      </span>
+                    )}
+                  </td>
                   <td>{persona.rut}</td>
                   <td>
                     {persona.tipoPersona && (
@@ -445,7 +479,8 @@ export function PersonasListPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
