@@ -251,15 +251,51 @@ function calcularEstadoCeldaServicios(
   return 'incompleto';
 }
 
+type EstadoBoletaTag = 'pagada' | 'incompleto' | 'no pagada';
+
 /**
- * TAG: el mes solo queda "pagado" si todas las boletas registradas ese mes
- * están abonadas. Sin boletas ese mes, no hay nada que evaluar (no aplica).
+ * El TAG funciona como un fondo de deuda: un abono no se destina a una
+ * boleta en particular, sino que va pagando las boletas más antiguas
+ * primero, sin importar en qué fecha se hizo cada abono (campo p.pagado no
+ * sirve para esto — nunca se actualiza al registrar un abono).
+ */
+function calcularEstadoBoletasTag(pagosDelAuto: PagoVehiculo[]): Map<string, EstadoBoletaTag> {
+  const boletas = pagosDelAuto
+    .filter((p) => p.tipo === 'TAG' && !p.esAbono)
+    .sort((a, b) => a.fechaPago.localeCompare(b.fechaPago));
+  let saldoAbonos = pagosDelAuto
+    .filter((p) => p.tipo === 'TAG' && p.esAbono)
+    .reduce((acc, p) => acc + Number(p.monto), 0);
+
+  const estados = new Map<string, EstadoBoletaTag>();
+  for (const boleta of boletas) {
+    const monto = Number(boleta.monto);
+    if (saldoAbonos >= monto) {
+      estados.set(boleta.id, 'pagada');
+      saldoAbonos -= monto;
+    } else if (saldoAbonos > 0) {
+      estados.set(boleta.id, 'incompleto');
+      saldoAbonos = 0;
+    } else {
+      estados.set(boleta.id, 'no pagada');
+    }
+  }
+  return estados;
+}
+
+/**
+ * TAG: el mes solo queda "pagado" si todas las boletas emitidas ese mes
+ * están cubiertas por el fondo de abonos acumulado. Sin boletas ese mes, no
+ * hay nada que evaluar (no aplica).
  */
 function calcularEstadoCeldaTag(mesKey: string, pagosDelAuto: PagoVehiculo[]): EstadoCelda {
-  const delMes = pagosDelAuto.filter((p) => p.tipo === 'TAG' && p.fechaPago.slice(0, 7) === mesKey);
-  if (delMes.length === 0) return 'na';
-  const pagadas = delMes.filter((p) => p.pagado).length;
-  if (pagadas === delMes.length) return 'pagado';
+  const estados = calcularEstadoBoletasTag(pagosDelAuto);
+  const boletasDelMes = pagosDelAuto.filter(
+    (p) => p.tipo === 'TAG' && !p.esAbono && p.fechaPago.slice(0, 7) === mesKey,
+  );
+  if (boletasDelMes.length === 0) return 'na';
+  const pagadas = boletasDelMes.filter((p) => estados.get(p.id) === 'pagada').length;
+  if (pagadas === boletasDelMes.length) return 'pagado';
   if (pagadas === 0) return 'atrasado';
   return 'incompleto';
 }
@@ -654,6 +690,16 @@ export function PagosResumenPage() {
     .filter((p) => !filtroTagCelda?.autoId || p.autoId === filtroTagCelda.autoId)
     .filter((p) => !filtroTagCelda?.mesKey || p.fechaPago.slice(0, 7) === filtroTagCelda.mesKey)
     .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
+
+  // El fondo de deuda del TAG es por auto: cada uno arma su propia cola de
+  // boletas más antiguas primero, sin mezclarse con la de otro vehículo.
+  const estadosBoletasTagPorAuto = new Map<string, Map<string, EstadoBoletaTag>>();
+  for (const autoId of new Set(pagosVehiculo.filter((p) => p.tipo === 'TAG').map((p) => p.autoId))) {
+    estadosBoletasTagPorAuto.set(
+      autoId,
+      calcularEstadoBoletasTag(pagosVehiculo.filter((p) => p.autoId === autoId)),
+    );
+  }
 
   const mantencionesTab = [...mantenciones].sort((a, b) =>
     b.fechaMantencion.localeCompare(a.fechaMantencion),
@@ -1295,22 +1341,43 @@ export function PagosResumenPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tagPagos.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <Link to={`/autos/${p.autoId}`}>{autoLabel(p.autoId)}</Link>
-                      </td>
-                      <td>{p.autopista ?? '—'}</td>
-                      <td>{p.numeroBoleta ?? '—'}</td>
-                      <td>{formatFecha(p.fechaPago)}</td>
-                      <td>{formatMonto(p.monto)}</td>
-                      <td>
-                        <span className={`badge badge--${p.pagado ? 'pagado' : 'pendiente'}`}>
-                          {p.pagado ? 'Sí' : 'No'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {tagPagos.map((p) => {
+                    const estadoBoleta = p.esAbono
+                      ? null
+                      : estadosBoletasTagPorAuto.get(p.autoId)?.get(p.id);
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <Link to={`/autos/${p.autoId}`}>{autoLabel(p.autoId)}</Link>
+                        </td>
+                        <td>{p.esAbono ? 'Abono' : (p.autopista ?? '—')}</td>
+                        <td>{p.numeroBoleta ?? '—'}</td>
+                        <td>{formatFecha(p.fechaPago)}</td>
+                        <td>{formatMonto(p.monto)}</td>
+                        <td>
+                          {p.esAbono ? (
+                            <span className="badge badge--abono">Abono</span>
+                          ) : (
+                            <span
+                              className={`badge badge--${
+                                estadoBoleta === 'pagada'
+                                  ? 'pagado'
+                                  : estadoBoleta === 'incompleto'
+                                    ? 'atrasado'
+                                    : 'pendiente'
+                              }`}
+                            >
+                              {estadoBoleta === 'pagada'
+                                ? 'Sí'
+                                : estadoBoleta === 'incompleto'
+                                  ? 'Parcial'
+                                  : 'No'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
