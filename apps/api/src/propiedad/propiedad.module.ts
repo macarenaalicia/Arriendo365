@@ -7,5 +7,6 @@ import { AdministradorBienModule } from '../administrador-bien/administrador-bie
   imports: [AdministradorBienModule],
   controllers: [PropiedadController],
   providers: [PropiedadService],
+  exports: [PropiedadService],
 })
 export class PropiedadModule {}

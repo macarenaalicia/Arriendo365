@@ -59,12 +59,44 @@ export class PropiedadService {
     }
   }
 
+  // Si una casa/vecindad no tiene una propia arrendada de forma directa (se
+  // arrienda completa), su estado se deduce de sus piezas: si ninguna está
+  // DISPONIBLE, queda ARRENDADA; si alguna sí, vuelve a DISPONIBLE. No pisa
+  // EN_MANTENCION/USUFRUCTO puestos a mano — solo alterna entre esos dos.
+  async sincronizarEstadoPadre(padreId: string) {
+    const padre = await this.prisma.propiedad.findUnique({ where: { id: padreId } });
+    if (!padre || (padre.estado !== 'DISPONIBLE' && padre.estado !== 'ARRENDADA')) return;
+
+    const arriendoPropioActivo = await this.prisma.arriendoPropiedad.findFirst({
+      where: { propiedadId: padreId, estado: 'ACTIVO' },
+    });
+    if (arriendoPropioActivo) return;
+
+    const piezas = await this.prisma.propiedad.findMany({
+      where: { propiedadPadreId: padreId },
+      select: { estado: true },
+    });
+    if (piezas.length === 0) return;
+
+    const hayDisponible = piezas.some((p) => p.estado === 'DISPONIBLE');
+    const nuevoEstado = hayDisponible ? 'DISPONIBLE' : 'ARRENDADA';
+    if (padre.estado !== nuevoEstado) {
+      await this.prisma.propiedad.update({ where: { id: padreId }, data: { estado: nuevoEstado } });
+    }
+  }
+
   async create(dto: CreatePropiedadDto) {
     await this.assertPadreValido(dto);
 
-    return this.prisma.propiedad.create({
+    const creada = await this.prisma.propiedad.create({
       data: { ...dto, organizacionId: this.tenant.organizacionId },
     });
+
+    if (creada.propiedadPadreId) {
+      await this.sincronizarEstadoPadre(creada.propiedadPadreId);
+    }
+
+    return creada;
   }
 
   async findAll() {
@@ -108,14 +140,25 @@ export class PropiedadService {
       });
     }
 
-    return this.prisma.propiedad.update({
+    const actualizada = await this.prisma.propiedad.update({
       where: { id },
       data: dto,
     });
+
+    // El padre "viejo" también se recalcula si la pieza se movió a otra
+    // propiedad madre (dejó una vacante donde estaba).
+    if (dto.propiedadPadreId !== undefined && actual.propiedadPadreId !== actualizada.propiedadPadreId) {
+      if (actual.propiedadPadreId) await this.sincronizarEstadoPadre(actual.propiedadPadreId);
+    }
+    if (actualizada.propiedadPadreId) {
+      await this.sincronizarEstadoPadre(actualizada.propiedadPadreId);
+    }
+
+    return actualizada;
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const propiedad = await this.findOne(id);
 
     const tieneArriendos = await this.prisma.arriendoPropiedad.findFirst({
       where: { propiedadId: id },
@@ -139,6 +182,10 @@ export class PropiedadService {
       this.prisma.proveedor.deleteMany({ where: { propiedadId: id } }),
       this.prisma.propiedad.delete({ where: { id } }),
     ]);
+
+    if (propiedad.propiedadPadreId) {
+      await this.sincronizarEstadoPadre(propiedad.propiedadPadreId);
+    }
   }
 
   async duplicar(id: string) {

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
 import { PdfService } from '../pdf/pdf.service';
 import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
+import { PropiedadService } from '../propiedad/propiedad.service';
 import { CreateArriendoPropiedadDto } from './dto/create-arriendo-propiedad.dto';
 import { UpdateArriendoPropiedadDto } from './dto/update-arriendo-propiedad.dto';
 import { FindArriendosPropiedadDto } from './dto/find-arriendos-propiedad.dto';
@@ -60,6 +61,7 @@ export class ArriendoPropiedadService {
     private readonly tenant: TenantContextService,
     private readonly pdf: PdfService,
     private readonly administradorBien: AdministradorBienService,
+    private readonly propiedadService: PropiedadService,
   ) {}
 
   private async assertPropiedadEnOrganizacion(propiedadId: string) {
@@ -96,6 +98,19 @@ export class ArriendoPropiedadService {
       await this.prisma.propiedad.update({ where: { id: propiedadId }, data: { estado: 'ARRENDADA' } });
     } else if (estadoArriendo === 'TERMINADO' || estadoArriendo === 'INACTIVO') {
       await this.prisma.propiedad.update({ where: { id: propiedadId }, data: { estado: 'DISPONIBLE' } });
+    } else {
+      return;
+    }
+
+    // Si esta propiedad es una pieza (habitación/loft/casa dentro de una
+    // vecindad), su madre también puede necesitar actualizarse: por ej. si
+    // esta era la última pieza disponible, la madre pasa a arrendada.
+    const propiedad = await this.prisma.propiedad.findUnique({
+      where: { id: propiedadId },
+      select: { propiedadPadreId: true },
+    });
+    if (propiedad?.propiedadPadreId) {
+      await this.propiedadService.sincronizarEstadoPadre(propiedad.propiedadPadreId);
     }
   }
 
