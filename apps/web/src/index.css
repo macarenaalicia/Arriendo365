@@ -972,6 +972,110 @@ section + section {
   color: #1e40af;
 }
 
+/* Matriz de pagos (vista simplificada mes x arriendo, con íconos grandes en
+   vez de montos — pensada para usuarios sin destreza tecnológica que están
+   acostumbrados a leer una planilla). */
+.matriz-pagos {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.matriz-pagos table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.matriz-pagos th,
+.matriz-pagos td {
+  padding: 0.4rem;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.matriz-pagos th {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.matriz-pagos td:first-child,
+.matriz-pagos th:first-child {
+  text-align: left;
+  padding-right: 1rem;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.celda-pago {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.celda-pago svg {
+  width: 18px;
+  height: 18px;
+}
+
+.celda-pago--pagado {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.celda-pago--pendiente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.celda-pago--incompleto {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.celda-pago--atrasado {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.celda-pago--na {
+  background: none;
+  color: var(--color-text-muted);
+  cursor: default;
+  font-weight: 400;
+}
+
+.matriz-pagos__leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.matriz-pagos__leyenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.matriz-pagos__leyenda .celda-pago {
+  width: 24px;
+  height: 24px;
+}
+
+.matriz-pagos__leyenda .celda-pago svg {
+  width: 13px;
+  height: 13px;
+}
+
 /* Tipo de pago de arriendo de auto: Arriendo/Abono/Garantía (ver
    tipoPagoDePago en AutoDetailPage) — distinto de la clasificación
    completo/parcial/final de propiedades. */

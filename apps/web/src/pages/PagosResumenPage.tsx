@@ -17,7 +17,7 @@ import type {
 import { ddmmyyyyToIso, formatFecha, formatMonto } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
-import { IconCheck, IconReloj } from '../components/icons';
+import { IconCheck, IconReloj, IconRechazar } from '../components/icons';
 import {
   MEDIOS_PAGO,
   calcularEsAbono,
@@ -132,6 +132,77 @@ const TIPO_PAGO_VEHICULO_LABELS: Record<TipoPagoVehiculo, string> = {
   MULTA: 'Multa',
 };
 
+const MESES_LABELS = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+];
+
+type EstadoCelda = 'pagado' | 'pendiente' | 'atrasado' | 'incompleto' | 'na';
+
+const CELDA_CONFIG: Record<EstadoCelda, { clase: string; icono: React.ReactNode; titulo: string }> = {
+  pagado: { clase: 'celda-pago--pagado', icono: <IconCheck />, titulo: 'Pagado' },
+  pendiente: { clase: 'celda-pago--pendiente', icono: <IconReloj />, titulo: 'Pendiente (aún no vence)' },
+  incompleto: { clase: 'celda-pago--incompleto', icono: '½', titulo: 'Incompleto (abono parcial)' },
+  atrasado: { clase: 'celda-pago--atrasado', icono: <IconRechazar />, titulo: 'Atrasado' },
+  na: { clase: 'celda-pago--na', icono: '—', titulo: 'No aplica este mes' },
+};
+
+/**
+ * Estado de un mes de arriendo para la matriz simplificada. Se basa en si
+ * hay pagos registrados ese mes (fechaComprometida), no en un campo
+ * "atrasado" persistido — hoy nada marca eso automáticamente en la base.
+ */
+function calcularEstadoCelda(
+  mesKey: string,
+  fechaEntrega: string,
+  montoArriendo: number,
+  pagosDelArriendo: Pago[],
+  hoy: Date,
+  diaPago: number | null,
+): EstadoCelda {
+  const mesEntregaKey = fechaEntrega.slice(0, 7);
+  const mesActualKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+
+  if (mesKey < mesEntregaKey) return 'na';
+  if (mesKey > mesActualKey) return 'na';
+
+  const delMes = pagosDelArriendo.filter(
+    (p) => p.fechaComprometida.slice(0, 7) === mesKey && p.estado !== 'RECHAZADO',
+  );
+
+  if (delMes.length === 0) {
+    if (mesKey === mesActualKey) {
+      return diaPago !== null && hoy.getDate() < diaPago ? 'pendiente' : 'atrasado';
+    }
+    return 'atrasado';
+  }
+
+  if (delMes.some((p) => p.aprobado === null)) return 'pendiente';
+
+  const totalPagado = delMes.reduce((suma, p) => suma + Number(p.monto), 0);
+  return totalPagado >= montoArriendo ? 'pagado' : 'incompleto';
+}
+
+interface FilaMatriz {
+  key: string;
+  label: string;
+  link: string | null;
+  fechaEntrega: string;
+  montoArriendo: number;
+  diaPago: number | null;
+  pagos: Pago[];
+}
+
 export function PagosResumenPage() {
   const [resumen, setResumen] = useState<ResumenPagos | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -142,6 +213,9 @@ export function PagosResumenPage() {
   const [autos, setAutos] = useState<Auto[]>([]);
   const [pagosVehiculo, setPagosVehiculo] = useState<PagoVehiculo[]>([]);
   const [mantenciones, setMantenciones] = useState<MantencionAuto[]>([]);
+  const [arriendosPropiedad, setArriendosPropiedad] = useState<ArriendoPropiedad[]>([]);
+  const [arriendosAuto, setArriendosAuto] = useState<ArriendoAuto[]>([]);
+  const [anioMatriz, setAnioMatriz] = useState(new Date().getFullYear());
 
   const [tabTipo, setTabTipo] = useState<TabPagos>('propiedad');
   const [vista, setVista] = useState<Vista>('default');
@@ -177,6 +251,8 @@ export function PagosResumenPage() {
       .then(([resumenData, pagosData, arriendosPropiedad, arriendosAuto]) => {
         setResumen(resumenData);
         setPagos(pagosData);
+        setArriendosPropiedad(arriendosPropiedad);
+        setArriendosAuto(arriendosAuto);
 
         const mapa: Record<string, ReferenciaArriendo> = {};
         const opciones: OpcionArriendo[] = [];
@@ -192,8 +268,8 @@ export function PagosResumenPage() {
           });
         });
         arriendosAuto.forEach((a) => {
-          const label = a.arrendatario.nombreCompleto;
-          mapa[`auto-${a.id}`] = { label, link: null };
+          const label = `${a.auto.patente} — ${a.arrendatario.nombreCompleto}`;
+          mapa[`auto-${a.id}`] = { label, link: `/autos/${a.autoId}` };
           opciones.push({ key: `auto-${a.id}`, arriendoTipo: 'auto', arriendoId: a.id, label });
         });
         setReferencias(mapa);
@@ -344,6 +420,53 @@ export function PagosResumenPage() {
     .filter((p) => p.tipo !== 'TAG')
     .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
 
+  const mostrarMatriz = tabTipo === 'propiedad' || tabTipo === 'auto';
+
+  const filasMatriz: FilaMatriz[] = !mostrarMatriz
+    ? []
+    : tabTipo === 'propiedad'
+      ? arriendosPropiedad
+          .filter((a) => a.estado === 'ACTIVO')
+          .map((a) => {
+            const label = `${a.propiedad.calle} ${a.propiedad.numero} — ${a.arrendatario.nombreCompleto}`;
+            return {
+              key: `propiedad-${a.id}`,
+              label,
+              link: `/arriendos/${a.id}`,
+              fechaEntrega: a.fechaEntrega,
+              montoArriendo: Number(a.montoArriendo),
+              diaPago: a.fechaPago,
+              pagos: pagos.filter(
+                (p) => p.arriendoTipo === 'propiedad' && p.arriendoId === a.id && p.categoria === 'ARRIENDO',
+              ),
+            };
+          })
+      : arriendosAuto
+          .filter((a) => a.estado === 'ACTIVO')
+          .map((a) => ({
+            key: `auto-${a.id}`,
+            label: `${a.auto.patente} — ${a.arrendatario.nombreCompleto}`,
+            link: `/autos/${a.autoId}`,
+            fechaEntrega: a.fechaEntrega,
+            montoArriendo: Number(a.montoArriendo),
+            diaPago: null,
+            pagos: pagos.filter(
+              (p) => p.arriendoTipo === 'auto' && p.arriendoId === a.id && p.categoria === 'ARRIENDO',
+            ),
+          }));
+
+  const mesesMatriz = Array.from({ length: 12 }, (_, i) => {
+    const key = `${anioMatriz}-${String(i + 1).padStart(2, '0')}`;
+    return { key, label: MESES_LABELS[i] };
+  });
+
+  const hoy = new Date();
+
+  const handleClickCelda = (fila: FilaMatriz, mesKey: string) => {
+    setVista('todos');
+    setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label, periodoPagoMes: mesKey });
+  };
+
   const resumenTab = ESTADOS_PAGO.reduce(
     (acc, estado) => {
       const delEstado = pagosTab.filter((p) => p.estado === estado);
@@ -421,6 +544,91 @@ export function PagosResumenPage() {
           </button>
         ))}
       </div>
+
+      {mostrarMatriz && (
+        <section>
+          <div className="page-header">
+            <h2>Vista rápida por mes</h2>
+            <div className="page-header__actions">
+              <select
+                value={anioMatriz}
+                onChange={(e) => setAnioMatriz(Number(e.target.value))}
+              >
+                {[hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2].map((anio) => (
+                  <option key={anio} value={anio}>
+                    {anio}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {filasMatriz.length === 0 ? (
+            <p className="empty-state">Sin arriendos activos.</p>
+          ) : (
+            <>
+              <div className="matriz-pagos">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{tabTipo === 'propiedad' ? 'Propiedad' : 'Auto'}</th>
+                      {mesesMatriz.map((mes) => (
+                        <th key={mes.key}>{mes.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filasMatriz.map((fila) => (
+                      <tr key={fila.key}>
+                        <td>{fila.link ? <Link to={fila.link}>{fila.label}</Link> : fila.label}</td>
+                        {mesesMatriz.map((mes) => {
+                          const estadoCelda = calcularEstadoCelda(
+                            mes.key,
+                            fila.fechaEntrega,
+                            fila.montoArriendo,
+                            fila.pagos,
+                            hoy,
+                            fila.diaPago,
+                          );
+                          const config = CELDA_CONFIG[estadoCelda];
+                          const esNa = estadoCelda === 'na';
+                          return (
+                            <td key={mes.key}>
+                              <button
+                                type="button"
+                                className={`celda-pago ${config.clase}`}
+                                title={config.titulo}
+                                aria-label={`${fila.label}, ${mes.label}: ${config.titulo}`}
+                                disabled={esNa}
+                                onClick={() => handleClickCelda(fila, mes.key)}
+                              >
+                                {config.icono}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="matriz-pagos__leyenda">
+                {(Object.keys(CELDA_CONFIG) as EstadoCelda[])
+                  .filter((estado) => estado !== 'na')
+                  .map((estado) => (
+                    <span key={estado}>
+                      <span className={`celda-pago ${CELDA_CONFIG[estado].clase}`}>
+                        {CELDA_CONFIG[estado].icono}
+                      </span>
+                      {CELDA_CONFIG[estado].titulo}
+                    </span>
+                  ))}
+              </div>
+              <p className="empty-state">Haz clic en un ícono para ver el detalle de ese mes abajo.</p>
+            </>
+          )}
+        </section>
+      )}
 
       {esTabPago && (
         <div className="stat-grid">
