@@ -1480,7 +1480,7 @@ export function PagosResumenPage() {
       {esTabPago && (
       <section>
         <div className="page-header">
-          <h2>Pagos registrados</h2>
+          <h2>Pagos registrados ({pagosFiltrados.length})</h2>
           <div className="page-header__actions">
             <select value={vista} onChange={(e) => setVista(e.target.value as Vista)}>
               {(Object.keys(VISTA_LABELS) as Vista[]).map((v) => (
@@ -1640,6 +1640,7 @@ export function PagosResumenPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th>#</th>
                   <th>Arriendo</th>
                   <th>Fecha de pago</th>
                   <th>Periodo de pago</th>
@@ -1651,6 +1652,7 @@ export function PagosResumenPage() {
                   <th>Revisión</th>
                 </tr>
                 <tr className="table__filter-row">
+                  <th></th>
                   <th>
                     <select
                       value={filtrosCol.arriendo}
@@ -1784,15 +1786,16 @@ export function PagosResumenPage() {
               <tbody>
                 {pagosFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="empty-state">
+                    <td colSpan={10} className="empty-state">
                       No hay pagos que coincidan con este filtro.
                     </td>
                   </tr>
                 )}
-                {pagosFiltrados.map((pago) => {
+                {pagosFiltrados.map((pago, index) => {
                   const ref = referencias[`${pago.arriendoTipo}-${pago.arriendoId}`];
                   return (
                     <tr key={pago.id}>
+                      <td>{index + 1}</td>
                       <td>
                         {ref?.link ? (
                           <Link to={ref.link}>{ref.label}</Link>
