@@ -1529,11 +1529,13 @@ export function PagosResumenPage() {
                       setCreateForm({ ...createForm, categoria: e.target.value as CategoriaPago })
                     }
                   >
-                    {(Object.keys(CATEGORIA_PAGO_LABELS) as CategoriaPago[]).map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORIA_PAGO_LABELS[c]}
-                      </option>
-                    ))}
+                    {(Object.keys(CATEGORIA_PAGO_LABELS) as CategoriaPago[])
+                      .filter((c) => tabTipo !== 'auto' || c !== 'SERVICIOS_BASICOS')
+                      .map((c) => (
+                        <option key={c} value={c}>
+                          {CATEGORIA_PAGO_LABELS[c]}
+                        </option>
+                      ))}
                   </select>
                 </label>
                 {createForm.categoria === 'SERVICIOS_BASICOS' && (
@@ -1743,11 +1745,13 @@ export function PagosResumenPage() {
                       }
                     >
                       <option value="">Todos</option>
-                      {(Object.keys(CATEGORIA_PAGO_LABELS) as CategoriaPago[]).map((c) => (
-                        <option key={c} value={c}>
-                          {CATEGORIA_PAGO_LABELS[c]}
-                        </option>
-                      ))}
+                      {(Object.keys(CATEGORIA_PAGO_LABELS) as CategoriaPago[])
+                        .filter((c) => tabTipo !== 'auto' || c !== 'SERVICIOS_BASICOS')
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {CATEGORIA_PAGO_LABELS[c]}
+                          </option>
+                        ))}
                     </select>
                   </th>
                   <th>
