@@ -175,13 +175,17 @@ function calcularEstadoCelda(
   const mesActualKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
 
   if (mesKey < mesEntregaKey) return 'na';
-  if (mesKey > mesActualKey) return 'na';
 
   const delMes = pagosDelArriendo.filter(
     (p) => p.fechaComprometida.slice(0, 7) === mesKey && p.estado !== 'RECHAZADO',
   );
 
   if (delMes.length === 0) {
+    // Mes futuro sin nada pagado todavía: no vencido, no hay nada que
+    // mostrar — pero sigue siendo clickeable para adelantar un pago (ver
+    // "esNa" en el render, que solo deshabilita los meses previos a la
+    // fecha de entrega, no los futuros).
+    if (mesKey > mesActualKey) return 'na';
     if (mesKey === mesActualKey && diaPago !== null) {
       // Si el día de pago pactado (ej. 31) no existe en este mes (ej.
       // febrero), se corre al último día del mes — igual que al calcular la
@@ -840,6 +844,13 @@ export function PagosResumenPage() {
                                 );
                           const config = CELDA_CONFIG[estadoCelda];
                           const esNa = estadoCelda === 'na';
+                          // Un mes futuro sin pagos también sale "na" (nada
+                          // que mostrar), pero a diferencia de un mes previo
+                          // a la fecha de entrega, sí se puede usar para
+                          // adelantar un pago — solo Servicios básicos (sin
+                          // pago rápido) sigue deshabilitando todo "na".
+                          const antesDeEntrega = mes.key < fila.fechaEntrega.slice(0, 7);
+                          const deshabilitada = tabTipo === 'servicios' ? esNa : antesDeEntrega;
                           return (
                             <td key={mes.key}>
                               <button
@@ -847,7 +858,7 @@ export function PagosResumenPage() {
                                 className={`celda-pago ${config.clase}`}
                                 title={config.titulo}
                                 aria-label={`${fila.label}, ${mes.label}: ${config.titulo}`}
-                                disabled={esNa}
+                                disabled={deshabilitada}
                                 onClick={() => handleClickCelda(fila, mes.key, estadoCelda)}
                               >
                                 {config.icono}
@@ -875,7 +886,7 @@ export function PagosResumenPage() {
               <p className="empty-state">
                 {tabTipo === 'servicios'
                   ? 'Haz clic en un ícono para ver el detalle de ese mes abajo.'
-                  : 'Haz clic en un ícono pendiente o atrasado para registrar el pago. Si ya está pagado, muestra el detalle abajo.'}
+                  : 'Haz clic en un ícono para registrar el pago de ese mes — incluye meses futuros, por si quieres adelantar uno. Si ya está pagado, muestra el detalle abajo.'}
               </p>
             </>
           )}
