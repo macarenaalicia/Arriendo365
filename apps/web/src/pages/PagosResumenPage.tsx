@@ -4,10 +4,14 @@ import { api, ApiError } from '../api/client';
 import type {
   ArriendoAuto,
   ArriendoPropiedad,
+  Auto,
   CategoriaPago,
   EstadoPago,
+  MantencionAuto,
   Pago,
+  PagoVehiculo,
   ResumenPagos,
+  TipoPagoVehiculo,
   TipoProveedor,
 } from '../api/types';
 import { ddmmyyyyToIso, formatFecha, formatMonto } from '../lib/format';
@@ -109,6 +113,25 @@ const CREATE_FORM_INICIAL = {
   tipoServicio: '' as TipoProveedor | '',
 };
 
+type TabPagos = 'propiedad' | 'servicios' | 'auto' | 'tag' | 'mantencion';
+
+const TAB_LABELS: Record<TabPagos, string> = {
+  propiedad: 'Propiedades',
+  servicios: 'Servicios básicos',
+  auto: 'Auto',
+  tag: 'TAG',
+  mantencion: 'Mantenciones',
+};
+
+const TIPO_PAGO_VEHICULO_LABELS: Record<TipoPagoVehiculo, string> = {
+  SEGURO: 'Seguro',
+  TAG: 'TAG',
+  REVISION_TECNICA: 'Revisión técnica',
+  PERMISO_CIRCULACION: 'Permiso de circulación',
+  SOAP: 'SOAP',
+  MULTA: 'Multa',
+};
+
 export function PagosResumenPage() {
   const [resumen, setResumen] = useState<ResumenPagos | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -116,7 +139,11 @@ export function PagosResumenPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [tabTipo, setTabTipo] = useState<'propiedad' | 'auto'>('propiedad');
+  const [autos, setAutos] = useState<Auto[]>([]);
+  const [pagosVehiculo, setPagosVehiculo] = useState<PagoVehiculo[]>([]);
+  const [mantenciones, setMantenciones] = useState<MantencionAuto[]>([]);
+
+  const [tabTipo, setTabTipo] = useState<TabPagos>('propiedad');
   const [vista, setVista] = useState<Vista>('default');
   const [filtroEstado, setFiltroEstado] = useState<EstadoPago | ''>('');
   const [filtrosCol, setFiltrosCol] = useState(FILTROS_COLUMNA_INICIAL);
@@ -174,6 +201,21 @@ export function PagosResumenPage() {
       })
       .catch(() => setError('No se pudo cargar el resumen de pagos'))
       .finally(() => setLoading(false));
+  }, []);
+
+  // TAG y Mantenciones (que incluye multas) viven en modelos aparte, sin
+  // relación con Pago, y solo se listan por auto — para verlos todos juntos
+  // acá hay que traer cada auto y agregar sus registros.
+  useEffect(() => {
+    api.get<Auto[]>('/autos').then((autosData) => {
+      setAutos(autosData);
+      Promise.all(autosData.map((a) => api.get<PagoVehiculo[]>(`/autos/${a.id}/pagos-vehiculo`))).then(
+        (porAuto) => setPagosVehiculo(porAuto.flat()),
+      );
+      Promise.all(autosData.map((a) => api.get<MantencionAuto[]>(`/autos/${a.id}/mantenciones`))).then(
+        (porAuto) => setMantenciones(porAuto.flat()),
+      );
+    });
   }, []);
 
   const cerrarCreacion = () => {
@@ -279,7 +321,28 @@ export function PagosResumenPage() {
   const arriendoLabel = (pago: Pago) =>
     referencias[`${pago.arriendoTipo}-${pago.arriendoId}`]?.label ?? '—';
 
-  const pagosTab = pagos.filter((p) => p.arriendoTipo === tabTipo);
+  const autoLabel = (autoId: string) => autos.find((a) => a.id === autoId)?.patente ?? '—';
+
+  const esTabPago = tabTipo === 'propiedad' || tabTipo === 'servicios' || tabTipo === 'auto';
+
+  const pagosTab = !esTabPago
+    ? []
+    : pagos.filter((p) => {
+        if (tabTipo === 'servicios') return p.categoria === 'SERVICIOS_BASICOS';
+        if (tabTipo === 'propiedad') return p.arriendoTipo === 'propiedad' && p.categoria !== 'SERVICIOS_BASICOS';
+        return p.arriendoTipo === 'auto';
+      });
+
+  const tagPagos = pagosVehiculo
+    .filter((p) => p.tipo === 'TAG')
+    .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
+
+  const mantencionesTab = [...mantenciones].sort((a, b) =>
+    b.fechaMantencion.localeCompare(a.fechaMantencion),
+  );
+  const multasYOtros = pagosVehiculo
+    .filter((p) => p.tipo !== 'TAG')
+    .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
 
   const resumenTab = ESTADOS_PAGO.reduce(
     (acc, estado) => {
@@ -347,34 +410,153 @@ export function PagosResumenPage() {
       <h1>Resumen de pagos</h1>
 
       <div className="tabs">
-        <button
-          type="button"
-          className={`tabs__button${tabTipo === 'propiedad' ? ' tabs__button--active' : ''}`}
-          onClick={() => setTabTipo('propiedad')}
-        >
-          Propiedades
-        </button>
-        <button
-          type="button"
-          className={`tabs__button${tabTipo === 'auto' ? ' tabs__button--active' : ''}`}
-          onClick={() => setTabTipo('auto')}
-        >
-          Autos
-        </button>
+        {(Object.keys(TAB_LABELS) as TabPagos[]).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            className={`tabs__button${tabTipo === tab ? ' tabs__button--active' : ''}`}
+            onClick={() => setTabTipo(tab)}
+          >
+            {TAB_LABELS[tab]}
+          </button>
+        ))}
       </div>
 
-      <div className="stat-grid">
-        {(Object.entries(resumenTab) as [EstadoPago, { cantidad: number; montoTotal: number }][]).map(
-          ([estado, datos]) => (
-            <div key={estado} className={`stat-card stat-card--${estado.toLowerCase()}`}>
-              <span className="stat-card__label">{ESTADO_LABELS[estado]}</span>
-              <span className="stat-card__value">{formatMonto(datos.montoTotal)}</span>
-              <span className="stat-card__count">{datos.cantidad} pago(s)</span>
+      {esTabPago && (
+        <div className="stat-grid">
+          {(Object.entries(resumenTab) as [EstadoPago, { cantidad: number; montoTotal: number }][]).map(
+            ([estado, datos]) => (
+              <div key={estado} className={`stat-card stat-card--${estado.toLowerCase()}`}>
+                <span className="stat-card__label">{ESTADO_LABELS[estado]}</span>
+                <span className="stat-card__value">{formatMonto(datos.montoTotal)}</span>
+                <span className="stat-card__count">{datos.cantidad} pago(s)</span>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+
+      {tabTipo === 'tag' && (
+        <section>
+          <h2>TAG</h2>
+          {tagPagos.length === 0 ? (
+            <p className="empty-state">Sin cobros de TAG registrados.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Auto</th>
+                    <th>Autopista</th>
+                    <th>N° boleta</th>
+                    <th>Fecha</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tagPagos.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <Link to={`/autos/${p.autoId}`}>{autoLabel(p.autoId)}</Link>
+                      </td>
+                      <td>{p.autopista ?? '—'}</td>
+                      <td>{p.numeroBoleta ?? '—'}</td>
+                      <td>{formatFecha(p.fechaPago)}</td>
+                      <td>{formatMonto(p.monto)}</td>
+                      <td>
+                        <span className={`badge badge--${p.estado.toLowerCase()}`}>{p.estado}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ),
-        )}
-      </div>
+          )}
+        </section>
+      )}
 
+      {tabTipo === 'mantencion' && (
+        <>
+          <section>
+            <h2>Mantenciones</h2>
+            {mantencionesTab.length === 0 ? (
+              <p className="empty-state">Sin mantenciones registradas.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Auto</th>
+                      <th>Tipos</th>
+                      <th>Fecha</th>
+                      <th>Costo</th>
+                      <th>Quién paga</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mantencionesTab.map((m) => (
+                      <tr key={m.id}>
+                        <td>
+                          <Link to={`/autos/${m.autoId}`}>{autoLabel(m.autoId)}</Link>
+                        </td>
+                        <td>{m.items.map((i) => i.configuracion.tipo).join(', ')}</td>
+                        <td>{formatFecha(m.fechaMantencion)}</td>
+                        <td>{m.costo !== null ? formatMonto(m.costo) : '—'}</td>
+                        <td>{m.quienPago ?? '—'}</td>
+                        <td>
+                          <span className={`badge badge--${m.estadoPago.toLowerCase()}`}>
+                            {m.estadoPago}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2>Multas y otros</h2>
+            {multasYOtros.length === 0 ? (
+              <p className="empty-state">Sin multas u otros cobros registrados.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Auto</th>
+                      <th>Tipo</th>
+                      <th>Fecha</th>
+                      <th>Monto</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {multasYOtros.map((p) => (
+                      <tr key={p.id}>
+                        <td>
+                          <Link to={`/autos/${p.autoId}`}>{autoLabel(p.autoId)}</Link>
+                        </td>
+                        <td>{TIPO_PAGO_VEHICULO_LABELS[p.tipo]}</td>
+                        <td>{formatFecha(p.fechaPago)}</td>
+                        <td>{formatMonto(p.monto)}</td>
+                        <td>
+                          <span className={`badge badge--${p.estado.toLowerCase()}`}>{p.estado}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {esTabPago && (
       <section>
         <div className="page-header">
           <h2>Pagos registrados</h2>
@@ -770,6 +952,7 @@ export function PagosResumenPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }
