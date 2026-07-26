@@ -6,6 +6,7 @@ import type {
   ArriendoPropiedad,
   Auto,
   CategoriaPago,
+  ConfiguracionMantencion,
   EstadoPago,
   MantencionAuto,
   Pago,
@@ -290,6 +291,9 @@ export function PagosResumenPage() {
   const [autos, setAutos] = useState<Auto[]>([]);
   const [pagosVehiculo, setPagosVehiculo] = useState<PagoVehiculo[]>([]);
   const [mantenciones, setMantenciones] = useState<MantencionAuto[]>([]);
+  const [configuracionesMantencion, setConfiguracionesMantencion] = useState<ConfiguracionMantencion[]>(
+    [],
+  );
   const [arriendosPropiedad, setArriendosPropiedad] = useState<ArriendoPropiedad[]>([]);
   const [arriendosAuto, setArriendosAuto] = useState<ArriendoAuto[]>([]);
   const [anioMatriz, setAnioMatriz] = useState(new Date().getFullYear());
@@ -397,6 +401,7 @@ export function PagosResumenPage() {
         (porAuto) => setMantenciones(porAuto.flat()),
       );
     });
+    api.get<ConfiguracionMantencion[]>('/configuraciones-mantencion').then(setConfiguracionesMantencion);
   }, []);
 
   const cerrarCreacion = () => {
@@ -1284,7 +1289,7 @@ export function PagosResumenPage() {
                     <th>N° boleta</th>
                     <th>Fecha</th>
                     <th>Monto</th>
-                    <th>Estado</th>
+                    <th>Pagado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1298,7 +1303,9 @@ export function PagosResumenPage() {
                       <td>{formatFecha(p.fechaPago)}</td>
                       <td>{formatMonto(p.monto)}</td>
                       <td>
-                        <span className={`badge badge--${p.estado.toLowerCase()}`}>{p.estado}</span>
+                        <span className={`badge badge--${p.pagado ? 'pagado' : 'pendiente'}`}>
+                          {p.pagado ? 'Sí' : 'No'}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -1321,7 +1328,9 @@ export function PagosResumenPage() {
                   <thead>
                     <tr>
                       <th>Auto</th>
-                      <th>Tipos</th>
+                      {configuracionesMantencion.map((c) => (
+                        <th key={c.id}>{c.tipo}</th>
+                      ))}
                       <th>Fecha</th>
                       <th>Costo</th>
                       <th>Quién paga</th>
@@ -1334,7 +1343,17 @@ export function PagosResumenPage() {
                         <td>
                           <Link to={`/autos/${m.autoId}`}>{autoLabel(m.autoId)}</Link>
                         </td>
-                        <td>{m.items.map((i) => i.configuracion.tipo).join(', ')}</td>
+                        {configuracionesMantencion.map((c) => (
+                          <td key={c.id} style={{ textAlign: 'center' }}>
+                            {m.items.some((i) => i.configuracionId === c.id) ? (
+                              <span className="celda-pago celda-pago--pagado">
+                                <IconCheck />
+                              </span>
+                            ) : (
+                              ''
+                            )}
+                          </td>
+                        ))}
                         <td>{formatFecha(m.fechaMantencion)}</td>
                         <td>{m.costo !== null ? formatMonto(m.costo) : '—'}</td>
                         <td>{m.quienPago ?? '—'}</td>
