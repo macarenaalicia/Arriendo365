@@ -95,11 +95,13 @@ export function PersonasListPage() {
   };
 
   const cargarUsuarios = () => {
-    api.get<Usuario[]>('/usuarios').then(setUsuarios);
+    return api.get<Usuario[]>('/usuarios').then(setUsuarios);
   };
 
   useEffect(cargar, []);
-  useEffect(cargarUsuarios, []);
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
 
   const cerrarForm = () => {
     setShowForm(false);
@@ -211,7 +213,7 @@ export function PersonasListPage() {
         .then(setBienesForm);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accesoPersonaId, accesoForm.rol]);
+  }, [accesoPersonaId, accesoForm.rol, usuarios]);
 
   const cerrarAcceso = () => {
     setAccesoPersonaId(null);
@@ -276,8 +278,15 @@ export function PersonasListPage() {
           password: accesoForm.password,
         });
       }
-      cargarUsuarios();
-      cerrarAcceso();
+      await cargarUsuarios();
+      if (accesoForm.rol === 'ADMINISTRADOR') {
+        // Deja el modal abierto: recién ahora existe el usuario (creado o
+        // promovido a administrador en este mismo guardado), así que puede
+        // marcar sus bienes de inmediato sin tener que reabrir el modal.
+        setAccesoForm((prev) => ({ ...prev, password: '' }));
+      } else {
+        cerrarAcceso();
+      }
     } catch (err) {
       setAccesoError(err instanceof ApiError ? err.message : 'No se pudo guardar el acceso');
     } finally {
