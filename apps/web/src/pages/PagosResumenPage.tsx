@@ -1736,17 +1736,7 @@ export function PagosResumenPage() {
                       <td>{formatMonto(pago.monto)}</td>
                       <td>
                         {(() => {
-                          const tipo = clasificarTipoPago(
-                            pago,
-                            pagos.filter(
-                              (p) =>
-                                p.arriendoTipo === pago.arriendoTipo &&
-                                p.arriendoId === pago.arriendoId &&
-                                p.categoria === pago.categoria &&
-                                p.fechaComprometida.slice(0, 7) ===
-                                  pago.fechaComprometida.slice(0, 7),
-                            ),
-                          );
+                          const tipo = clasificarTipoPago(pago);
                           return (
                             <span className={`badge badge--${tipo}`}>
                               {TIPO_PAGO_CLASIFICADO_LABELS[tipo]}

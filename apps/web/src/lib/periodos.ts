@@ -89,38 +89,16 @@ export function calcularEsAbono(
   return sumaOtros + montoNuevo < montoArriendo;
 }
 
-export type TipoPagoClasificado = 'completo' | 'abono' | 'parcial' | 'final';
+export type TipoPagoClasificado = 'completo' | 'abono';
 
 export const TIPO_PAGO_CLASIFICADO_LABELS: Record<TipoPagoClasificado, string> = {
   completo: 'Pago completo',
   abono: 'Abono',
-  parcial: 'Pago parcial',
-  final: 'Pago final',
 };
 
-/**
- * Clasifica un pago de arriendo dentro del ciclo al que pertenece, según su
- * posición entre los demás pagos del mismo periodo:
- * - "completo": el único pago del periodo y cierra el saldo.
- * - "abono": primer pago del periodo, todavía no cierra el saldo.
- * - "parcial": pago intermedio, tampoco cierra el saldo.
- * - "final": el pago (no siendo el primero) que cierra el saldo.
- *
- * El orden se fija por fecha de creación y NUNCA se filtra por estado: que
- * un pago (este u otro del mismo periodo) se rechace es un resultado de la
- * revisión, no debe recalcular con qué tipo quedó marcado cada pago.
- */
-export function clasificarTipoPago(
-  pago: Pago,
-  pagosMismoPeriodo: Pago[],
-): TipoPagoClasificado {
-  const ordenados = [...pagosMismoPeriodo].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const esPrimero = ordenados.findIndex((p) => p.id === pago.id) <= 0;
-
-  if (!pago.esAbono) {
-    return esPrimero ? 'completo' : 'final';
-  }
-  return esPrimero ? 'abono' : 'parcial';
+/** Clasifica un pago de arriendo: "abono" si no cierra el saldo del periodo, "completo" si lo cierra. */
+export function clasificarTipoPago(pago: Pago): TipoPagoClasificado {
+  return pago.esAbono ? 'abono' : 'completo';
 }
 
 /** Asegura que el mes de un pago existente (al editar) esté en la lista, aunque caiga fuera de la ventana. */

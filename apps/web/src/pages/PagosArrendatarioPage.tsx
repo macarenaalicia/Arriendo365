@@ -276,14 +276,7 @@ function BloquePagosCategoria({
                   <td>{formatMonto(pago.monto)}</td>
                   <td>
                     {(() => {
-                      const tipo = clasificarTipoPago(
-                        pago,
-                        pagos.filter(
-                          (p) =>
-                            p.fechaComprometida.slice(0, 7) ===
-                            pago.fechaComprometida.slice(0, 7),
-                        ),
-                      );
+                      const tipo = clasificarTipoPago(pago);
                       return (
                         <span className={`badge badge--${tipo}`}>
                           {TIPO_PAGO_CLASIFICADO_LABELS[tipo]}
