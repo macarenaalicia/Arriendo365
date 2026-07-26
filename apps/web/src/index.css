@@ -1697,6 +1697,11 @@ section + section {
   color: #9d174d;
 }
 
+.badge--loft {
+  background: #cffafe;
+  color: #155e75;
+}
+
 .badge--terreno {
   background: #ecfccb;
   color: #3f6212;
