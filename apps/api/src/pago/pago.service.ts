@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { EstadoPago, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../administrador-bien/administrador-bien.service';
 import { ArriendoTipo, CreatePagoDto } from './dto/create-pago.dto';
 import { UpdatePagoDto } from './dto/update-pago.dto';
 import { FindPagosDto } from './dto/find-pagos.dto';
@@ -11,17 +12,22 @@ export class PagoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   private async assertArriendoEnOrganizacion(arriendoTipo: ArriendoTipo, arriendoId: string) {
     const organizacionId = this.tenant.organizacionId;
+    const { propiedadIds, autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
 
     const existe =
       arriendoTipo === 'propiedad'
         ? await this.prisma.arriendoPropiedad.findFirst({
             where: {
               id: arriendoId,
-              propiedad: { organizacionId },
+              propiedad: {
+                organizacionId,
+                ...(propiedadIds ? { id: { in: propiedadIds } } : {}),
+              },
               ...(this.tenant.esArrendatario
                 ? {
                     OR: [
@@ -35,7 +41,10 @@ export class PagoService {
         : await this.prisma.arriendoAuto.findFirst({
             where: {
               id: arriendoId,
-              auto: { organizacionId },
+              auto: {
+                organizacionId,
+                ...(autoIds ? { id: { in: autoIds } } : {}),
+              },
               ...(this.tenant.esArrendatario ? { arrendatarioId: this.tenant.personaId } : {}),
             },
           });
@@ -74,13 +83,22 @@ export class PagoService {
       };
     }
 
+    const { propiedadIds: propiedadIdsFiltro, autoIds: autoIdsFiltro } =
+      await this.administradorBien.getFiltroBienesUsuarioActual();
+
     const [arriendosPropiedad, arriendosAuto] = await Promise.all([
       this.prisma.arriendoPropiedad.findMany({
-        where: { propiedad: { organizacionId } },
+        where: {
+          propiedad: { organizacionId },
+          ...(propiedadIdsFiltro ? { propiedadId: { in: propiedadIdsFiltro } } : {}),
+        },
         select: { id: true },
       }),
       this.prisma.arriendoAuto.findMany({
-        where: { auto: { organizacionId } },
+        where: {
+          auto: { organizacionId },
+          ...(autoIdsFiltro ? { autoId: { in: autoIdsFiltro } } : {}),
+        },
         select: { id: true },
       }),
     ]);

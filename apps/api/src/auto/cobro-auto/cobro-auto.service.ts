@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../common/tenant/tenant-context.service';
+import { AdministradorBienService } from '../../administrador-bien/administrador-bien.service';
 import { CreateCobroAutoDto } from './dto/create-cobro-auto.dto';
 import { UpdateCobroAutoDto } from './dto/update-cobro-auto.dto';
 
@@ -9,11 +10,17 @@ export class CobroAutoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly administradorBien: AdministradorBienService,
   ) {}
 
   private async assertAutoEnOrganizacion(autoId: string) {
+    const { autoIds } = await this.administradorBien.getFiltroBienesUsuarioActual();
     const auto = await this.prisma.auto.findFirst({
-      where: { id: autoId, organizacionId: this.tenant.organizacionId },
+      where: {
+        id: autoId,
+        organizacionId: this.tenant.organizacionId,
+        ...(autoIds ? { id: { in: autoIds } } : {}),
+      },
     });
     if (!auto) {
       throw new NotFoundException('Auto no encontrado');
