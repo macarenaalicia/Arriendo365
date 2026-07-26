@@ -14,7 +14,7 @@ import type {
   TipoPagoVehiculo,
   TipoProveedor,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, formatMonto } from '../lib/format';
+import { ddmmyyyyToIso, formatFecha, formatMonto, hoyDdmmyyyy } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { IconCheck, IconReloj, IconRechazar } from '../components/icons';
@@ -22,6 +22,7 @@ import {
   MEDIOS_PAGO,
   calcularEsAbono,
   clasificarTipoPago,
+  periodoValorAFecha,
   TIPO_PAGO_CLASIFICADO_LABELS,
 } from '../lib/periodos';
 
@@ -282,6 +283,18 @@ export function PagosResumenPage() {
   const [anioMatriz, setAnioMatriz] = useState(new Date().getFullYear());
   const [filtroTagCelda, setFiltroTagCelda] = useState<{ autoId: string; mesKey: string } | null>(null);
 
+  const [celdaSeleccionada, setCeldaSeleccionada] = useState<{ fila: FilaMatriz; mesKey: string } | null>(
+    null,
+  );
+  const [pagoRapidoForm, setPagoRapidoForm] = useState({
+    fecha: '',
+    medioPago: '',
+    esAbono: false,
+    monto: '',
+  });
+  const [pagoRapidoError, setPagoRapidoError] = useState<string | null>(null);
+  const [guardandoPagoRapido, setGuardandoPagoRapido] = useState(false);
+
   const [tabTipo, setTabTipo] = useState<TabPagos>('propiedad');
   const [vista, setVista] = useState<Vista>('default');
   const [filtroEstado, setFiltroEstado] = useState<EstadoPago | ''>('');
@@ -451,6 +464,80 @@ export function PagosResumenPage() {
     cargarPagos();
   };
 
+  const cerrarPagoRapido = () => {
+    setCeldaSeleccionada(null);
+    setPagoRapidoForm({ fecha: '', medioPago: '', esAbono: false, monto: '' });
+    setPagoRapidoError(null);
+  };
+
+  const abrirPagoRapido = (fila: FilaMatriz, mesKey: string) => {
+    setCeldaSeleccionada({ fila, mesKey });
+    setPagoRapidoForm({ fecha: hoyDdmmyyyy(), medioPago: '', esAbono: false, monto: '' });
+    setPagoRapidoError(null);
+  };
+
+  // Todos los pagos no rechazados de ese arriendo en ese mes — de ahí sale
+  // si hay un abono pendiente de aprobar y cuánto falta por pagar.
+  const pagosDelMesSeleccionada = celdaSeleccionada
+    ? celdaSeleccionada.fila.pagos.filter(
+        (p) =>
+          p.fechaComprometida.slice(0, 7) === celdaSeleccionada.mesKey && p.estado !== 'RECHAZADO',
+      )
+    : [];
+  const pagoPendienteAprobacion = pagosDelMesSeleccionada.find((p) => p.aprobado === null) ?? null;
+  const totalPagadoMesSeleccionado = pagosDelMesSeleccionada.reduce((s, p) => s + Number(p.monto), 0);
+  const saldoPendienteMesSeleccionado = celdaSeleccionada
+    ? Math.max(celdaSeleccionada.fila.montoArriendo - totalPagadoMesSeleccionado, 0)
+    : 0;
+
+  const handleGuardarPagoRapido = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!celdaSeleccionada) return;
+    setPagoRapidoError(null);
+
+    const fechaPago = ddmmyyyyToIso(pagoRapidoForm.fecha);
+    if (!fechaPago) {
+      setPagoRapidoError('Fecha inválida, usa el formato dd/mm/aaaa.');
+      return;
+    }
+    if (!pagoRapidoForm.medioPago) {
+      setPagoRapidoError('Elige el medio de pago.');
+      return;
+    }
+    const monto = pagoRapidoForm.esAbono ? Number(pagoRapidoForm.monto) : saldoPendienteMesSeleccionado;
+    if (!monto || monto <= 0) {
+      setPagoRapidoError('Ingresa un monto válido.');
+      return;
+    }
+
+    const arriendoTipo = celdaSeleccionada.fila.key.startsWith('auto-') ? 'auto' : 'propiedad';
+    const arriendoId = celdaSeleccionada.fila.key.replace(/^(propiedad|auto)-/, '');
+    const fechaComprometida = periodoValorAFecha(
+      celdaSeleccionada.mesKey,
+      celdaSeleccionada.fila.diaPago ?? 1,
+    );
+
+    setGuardandoPagoRapido(true);
+    try {
+      await api.post('/pagos', {
+        arriendoTipo,
+        arriendoId,
+        periodo: fechaPago,
+        fechaComprometida,
+        monto,
+        medioPago: pagoRapidoForm.medioPago,
+        esAbono: calcularEsAbono(monto, celdaSeleccionada.fila.montoArriendo, pagosDelMesSeleccionada),
+        categoria: 'ARRIENDO',
+      });
+      cerrarPagoRapido();
+      cargarPagos();
+    } catch (err) {
+      setPagoRapidoError(err instanceof ApiError ? err.message : 'No se pudo registrar el pago');
+    } finally {
+      setGuardandoPagoRapido(false);
+    }
+  };
+
   if (loading) return <p>Cargando…</p>;
   if (error) return <p className="error-text">{error}</p>;
   if (!resumen) return null;
@@ -547,9 +634,17 @@ export function PagosResumenPage() {
 
   const hoy = new Date();
 
-  const handleClickCelda = (fila: FilaMatriz, mesKey: string) => {
-    setVista('todos');
-    setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label, periodoPagoMes: mesKey });
+  const handleClickCelda = (fila: FilaMatriz, mesKey: string, estadoCelda: EstadoCelda) => {
+    // Servicios básicos no tiene pago rápido: agua y luz son dos boletas
+    // separadas, sin un "monto esperado" único que autocompletar. Ya
+    // pagado tampoco: no hay nada que registrar. En esos casos solo filtra
+    // el detalle de abajo para revisarlo.
+    if (tabTipo === 'servicios' || estadoCelda === 'pagado') {
+      setVista('todos');
+      setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label, periodoPagoMes: mesKey });
+      return;
+    }
+    abrirPagoRapido(fila, mesKey);
   };
 
   const handleClickCeldaTag = (fila: FilaMatrizTag, mesKey: string) => {
@@ -753,7 +848,7 @@ export function PagosResumenPage() {
                                 title={config.titulo}
                                 aria-label={`${fila.label}, ${mes.label}: ${config.titulo}`}
                                 disabled={esNa}
-                                onClick={() => handleClickCelda(fila, mes.key)}
+                                onClick={() => handleClickCelda(fila, mes.key, estadoCelda)}
                               >
                                 {config.icono}
                               </button>
@@ -777,10 +872,132 @@ export function PagosResumenPage() {
                     </span>
                   ))}
               </div>
-              <p className="empty-state">Haz clic en un ícono para ver el detalle de ese mes abajo.</p>
+              <p className="empty-state">
+                {tabTipo === 'servicios'
+                  ? 'Haz clic en un ícono para ver el detalle de ese mes abajo.'
+                  : 'Haz clic en un ícono pendiente o atrasado para registrar el pago. Si ya está pagado, muestra el detalle abajo.'}
+              </p>
             </>
           )}
         </section>
+      )}
+
+      {celdaSeleccionada && (
+        <Modal
+          titulo={`${celdaSeleccionada.fila.label} — ${labelMes(celdaSeleccionada.mesKey)}`}
+          onClose={cerrarPagoRapido}
+        >
+          {pagoPendienteAprobacion ? (
+            <div className="inline-form">
+              <p>
+                Hay un abono de {formatMonto(pagoPendienteAprobacion.monto)} reportado por el
+                arrendatario, pendiente de aprobar.
+              </p>
+              <div className="table__actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAprobar(pagoPendienteAprobacion.id);
+                    cerrarPagoRapido();
+                  }}
+                >
+                  Aprobar
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => {
+                    handleRechazar(pagoPendienteAprobacion.id);
+                    cerrarPagoRapido();
+                  }}
+                >
+                  Rechazar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form className="inline-form" onSubmit={handleGuardarPagoRapido}>
+              <div className="inline-form__grid">
+                <label>
+                  Fecha de pago
+                  <DateInput
+                    value={pagoRapidoForm.fecha}
+                    onChange={(value) => setPagoRapidoForm({ ...pagoRapidoForm, fecha: value })}
+                    required
+                  />
+                </label>
+                <label>
+                  Medio de pago
+                  <select
+                    required
+                    value={pagoRapidoForm.medioPago}
+                    onChange={(e) => setPagoRapidoForm({ ...pagoRapidoForm, medioPago: e.target.value })}
+                  >
+                    <option value="">Selecciona…</option>
+                    {MEDIOS_PAGO.map((medio) => (
+                      <option key={medio} value={medio}>
+                        {medio}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {!pagoRapidoForm.esAbono ? (
+                <>
+                  <button type="submit" disabled={guardandoPagoRapido}>
+                    {guardandoPagoRapido
+                      ? 'Guardando…'
+                      : `✓ Marcar como pagado completo (${formatMonto(saldoPendienteMesSeleccionado)})`}
+                  </button>
+                  <p>
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() =>
+                        setPagoRapidoForm({
+                          ...pagoRapidoForm,
+                          esAbono: true,
+                          monto: String(saldoPendienteMesSeleccionado),
+                        })
+                      }
+                    >
+                      ¿Fue un abono parcial (autorizado por el propietario)?
+                    </button>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label>
+                    Monto abonado
+                    <input
+                      type="number"
+                      min={0}
+                      max={saldoPendienteMesSeleccionado}
+                      required
+                      value={pagoRapidoForm.monto}
+                      onChange={(e) => setPagoRapidoForm({ ...pagoRapidoForm, monto: e.target.value })}
+                    />
+                  </label>
+                  <div className="table__actions">
+                    <button type="submit" disabled={guardandoPagoRapido}>
+                      {guardandoPagoRapido ? 'Guardando…' : 'Registrar abono'}
+                    </button>
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => setPagoRapidoForm({ ...pagoRapidoForm, esAbono: false, monto: '' })}
+                    >
+                      Cancelar, fue pago completo
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {pagoRapidoError && <p className="auth-card__error">{pagoRapidoError}</p>}
+            </form>
+          )}
+        </Modal>
       )}
 
       {esTabPago && (
