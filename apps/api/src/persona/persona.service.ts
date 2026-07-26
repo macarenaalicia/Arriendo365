@@ -83,12 +83,40 @@ export class PersonaService {
   }
 
   async update(id: string, dto: UpdatePersonaDto) {
-    await this.findOne(id);
+    const actual = await this.findOne(id);
     const { recomendaciones: _recomendaciones, ...datos } = dto;
+    const organizacionId = this.tenant.organizacionId;
 
-    return this.prisma.persona.update({
-      where: { id },
-      data: datos,
+    return this.prisma.$transaction(async (tx) => {
+      const persona = await tx.persona.update({ where: { id }, data: datos });
+
+      // El Perfil (tipoPersona) es lo que se elige acá; el Rol del Usuario
+      // (permisos reales) vive aparte. Si cambia el perfil, el rol debe
+      // reflejarlo — igual que ya pasa al crear la persona por primera vez.
+      if (dto.tipoPersona && dto.tipoPersona !== actual.tipoPersona) {
+        const usuario = await tx.usuario.findFirst({ where: { personaId: id } });
+        const nuevoRolConAcceso = PERFILES_CON_ACCESO.includes(dto.tipoPersona as RolUsuario);
+
+        if (usuario && nuevoRolConAcceso) {
+          await tx.usuario.update({
+            where: { id: usuario.id },
+            data: { rol: dto.tipoPersona as RolUsuario },
+          });
+        } else if (!usuario && nuevoRolConAcceso) {
+          const passwordHash = await bcrypt.hash(PASSWORD_INICIAL, SALT_ROUNDS);
+          await tx.usuario.create({
+            data: {
+              organizacionId,
+              personaId: id,
+              rol: dto.tipoPersona as RolUsuario,
+              passwordHash,
+              debeCambiarPassword: true,
+            },
+          });
+        }
+      }
+
+      return persona;
     });
   }
 
