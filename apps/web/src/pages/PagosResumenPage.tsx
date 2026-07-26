@@ -193,6 +193,58 @@ function calcularEstadoCelda(
   return totalPagado >= montoArriendo ? 'pagado' : 'incompleto';
 }
 
+/**
+ * Servicios básicos: el mes solo queda "pagado" si agua Y luz están pagadas
+ * (gas no se exige — no todas las propiedades lo tienen contratado). Si
+ * falta una de las dos, "incompleto"; si no hay ninguna y el mes ya pasó,
+ * "atrasado".
+ */
+function calcularEstadoCeldaServicios(
+  mesKey: string,
+  fechaEntrega: string,
+  pagosDelArriendo: Pago[],
+  hoy: Date,
+): EstadoCelda {
+  const mesEntregaKey = fechaEntrega.slice(0, 7);
+  const mesActualKey = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+
+  if (mesKey < mesEntregaKey) return 'na';
+  if (mesKey > mesActualKey) return 'na';
+
+  const estadoTipo = (tipo: TipoProveedor): 'pagado' | 'pendiente' | 'falta' => {
+    const delMes = pagosDelArriendo.filter(
+      (p) =>
+        p.tipoServicio === tipo && p.fechaComprometida.slice(0, 7) === mesKey && p.estado !== 'RECHAZADO',
+    );
+    if (delMes.length === 0) return 'falta';
+    if (delMes.some((p) => p.aprobado === null)) return 'pendiente';
+    return 'pagado';
+  };
+
+  const agua = estadoTipo('AGUA');
+  const luz = estadoTipo('LUZ');
+
+  if (agua === 'pagado' && luz === 'pagado') return 'pagado';
+  if (agua === 'pendiente' || luz === 'pendiente') return 'pendiente';
+  if (agua === 'falta' && luz === 'falta') {
+    return mesKey === mesActualKey ? 'pendiente' : 'atrasado';
+  }
+  return 'incompleto';
+}
+
+/**
+ * TAG: el mes solo queda "pagado" si todas las boletas registradas ese mes
+ * están abonadas. Sin boletas ese mes, no hay nada que evaluar (no aplica).
+ */
+function calcularEstadoCeldaTag(mesKey: string, pagosDelAuto: PagoVehiculo[]): EstadoCelda {
+  const delMes = pagosDelAuto.filter((p) => p.tipo === 'TAG' && p.fechaPago.slice(0, 7) === mesKey);
+  if (delMes.length === 0) return 'na';
+  const pagadas = delMes.filter((p) => p.pagado).length;
+  if (pagadas === delMes.length) return 'pagado';
+  if (pagadas === 0) return 'atrasado';
+  return 'incompleto';
+}
+
 interface FilaMatriz {
   key: string;
   label: string;
@@ -201,6 +253,13 @@ interface FilaMatriz {
   montoArriendo: number;
   diaPago: number | null;
   pagos: Pago[];
+}
+
+interface FilaMatrizTag {
+  key: string;
+  label: string;
+  link: string | null;
+  pagosVehiculo: PagoVehiculo[];
 }
 
 export function PagosResumenPage() {
@@ -216,6 +275,7 @@ export function PagosResumenPage() {
   const [arriendosPropiedad, setArriendosPropiedad] = useState<ArriendoPropiedad[]>([]);
   const [arriendosAuto, setArriendosAuto] = useState<ArriendoAuto[]>([]);
   const [anioMatriz, setAnioMatriz] = useState(new Date().getFullYear());
+  const [filtroTagCelda, setFiltroTagCelda] = useState<{ autoId: string; mesKey: string } | null>(null);
 
   const [tabTipo, setTabTipo] = useState<TabPagos>('propiedad');
   const [vista, setVista] = useState<Vista>('default');
@@ -411,6 +471,11 @@ export function PagosResumenPage() {
 
   const tagPagos = pagosVehiculo
     .filter((p) => p.tipo === 'TAG')
+    .filter(
+      (p) =>
+        !filtroTagCelda ||
+        (p.autoId === filtroTagCelda.autoId && p.fechaPago.slice(0, 7) === filtroTagCelda.mesKey),
+    )
     .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
 
   const mantencionesTab = [...mantenciones].sort((a, b) =>
@@ -420,11 +485,11 @@ export function PagosResumenPage() {
     .filter((p) => p.tipo !== 'TAG')
     .sort((a, b) => b.fechaPago.localeCompare(a.fechaPago));
 
-  const mostrarMatriz = tabTipo === 'propiedad' || tabTipo === 'auto';
+  const mostrarMatriz =
+    tabTipo === 'propiedad' || tabTipo === 'servicios' || tabTipo === 'auto' || tabTipo === 'tag';
 
-  const filasMatriz: FilaMatriz[] = !mostrarMatriz
-    ? []
-    : tabTipo === 'propiedad'
+  const filasMatriz: FilaMatriz[] =
+    tabTipo === 'propiedad' || tabTipo === 'servicios'
       ? arriendosPropiedad
           .filter((a) => a.estado === 'ACTIVO')
           .map((a) => {
@@ -437,23 +502,38 @@ export function PagosResumenPage() {
               montoArriendo: Number(a.montoArriendo),
               diaPago: a.fechaPago,
               pagos: pagos.filter(
-                (p) => p.arriendoTipo === 'propiedad' && p.arriendoId === a.id && p.categoria === 'ARRIENDO',
+                (p) =>
+                  p.arriendoTipo === 'propiedad' &&
+                  p.arriendoId === a.id &&
+                  p.categoria === (tabTipo === 'servicios' ? 'SERVICIOS_BASICOS' : 'ARRIENDO'),
               ),
             };
           })
-      : arriendosAuto
-          .filter((a) => a.estado === 'ACTIVO')
-          .map((a) => ({
-            key: `auto-${a.id}`,
-            label: `${a.auto.patente} — ${a.arrendatario.nombreCompleto}`,
-            link: `/autos/${a.autoId}`,
-            fechaEntrega: a.fechaEntrega,
-            montoArriendo: Number(a.montoArriendo),
-            diaPago: null,
-            pagos: pagos.filter(
-              (p) => p.arriendoTipo === 'auto' && p.arriendoId === a.id && p.categoria === 'ARRIENDO',
-            ),
-          }));
+      : tabTipo === 'auto'
+        ? arriendosAuto
+            .filter((a) => a.estado === 'ACTIVO')
+            .map((a) => ({
+              key: `auto-${a.id}`,
+              label: `${a.auto.patente} — ${a.arrendatario.nombreCompleto}`,
+              link: `/autos/${a.autoId}`,
+              fechaEntrega: a.fechaEntrega,
+              montoArriendo: Number(a.montoArriendo),
+              diaPago: null,
+              pagos: pagos.filter(
+                (p) => p.arriendoTipo === 'auto' && p.arriendoId === a.id && p.categoria === 'ARRIENDO',
+              ),
+            }))
+        : [];
+
+  const filasMatrizTag: FilaMatrizTag[] =
+    tabTipo !== 'tag'
+      ? []
+      : autos.map((a) => ({
+          key: `auto-${a.id}`,
+          label: a.patente,
+          link: `/autos/${a.id}`,
+          pagosVehiculo: pagosVehiculo.filter((p) => p.autoId === a.id),
+        }));
 
   const mesesMatriz = Array.from({ length: 12 }, (_, i) => {
     const key = `${anioMatriz}-${String(i + 1).padStart(2, '0')}`;
@@ -465,6 +545,10 @@ export function PagosResumenPage() {
   const handleClickCelda = (fila: FilaMatriz, mesKey: string) => {
     setVista('todos');
     setFiltrosCol({ ...FILTROS_COLUMNA_INICIAL, arriendo: fila.label, periodoPagoMes: mesKey });
+  };
+
+  const handleClickCeldaTag = (fila: FilaMatrizTag, mesKey: string) => {
+    setFiltroTagCelda({ autoId: fila.key.replace('auto-', ''), mesKey });
   };
 
   const resumenTab = ESTADOS_PAGO.reduce(
@@ -538,7 +622,10 @@ export function PagosResumenPage() {
             key={tab}
             type="button"
             className={`tabs__button${tabTipo === tab ? ' tabs__button--active' : ''}`}
-            onClick={() => setTabTipo(tab)}
+            onClick={() => {
+              setTabTipo(tab);
+              setFiltroTagCelda(null);
+            }}
           >
             {TAB_LABELS[tab]}
           </button>
@@ -563,7 +650,65 @@ export function PagosResumenPage() {
             </div>
           </div>
 
-          {filasMatriz.length === 0 ? (
+          {tabTipo === 'tag' ? (
+            filasMatrizTag.length === 0 ? (
+              <p className="empty-state">Sin autos registrados.</p>
+            ) : (
+              <>
+                <div className="matriz-pagos">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Auto</th>
+                        {mesesMatriz.map((mes) => (
+                          <th key={mes.key}>{mes.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filasMatrizTag.map((fila) => (
+                        <tr key={fila.key}>
+                          <td>{fila.link ? <Link to={fila.link}>{fila.label}</Link> : fila.label}</td>
+                          {mesesMatriz.map((mes) => {
+                            const estadoCelda = calcularEstadoCeldaTag(mes.key, fila.pagosVehiculo);
+                            const config = CELDA_CONFIG[estadoCelda];
+                            const esNa = estadoCelda === 'na';
+                            return (
+                              <td key={mes.key}>
+                                <button
+                                  type="button"
+                                  className={`celda-pago ${config.clase}`}
+                                  title={config.titulo}
+                                  aria-label={`${fila.label}, ${mes.label}: ${config.titulo}`}
+                                  disabled={esNa}
+                                  onClick={() => handleClickCeldaTag(fila, mes.key)}
+                                >
+                                  {config.icono}
+                                </button>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="matriz-pagos__leyenda">
+                  {(Object.keys(CELDA_CONFIG) as EstadoCelda[])
+                    .filter((estado) => estado !== 'na')
+                    .map((estado) => (
+                      <span key={estado}>
+                        <span className={`celda-pago ${CELDA_CONFIG[estado].clase}`}>
+                          {CELDA_CONFIG[estado].icono}
+                        </span>
+                        {CELDA_CONFIG[estado].titulo}
+                      </span>
+                    ))}
+                </div>
+                <p className="empty-state">Haz clic en un ícono para ver el detalle de ese mes abajo.</p>
+              </>
+            )
+          ) : filasMatriz.length === 0 ? (
             <p className="empty-state">Sin arriendos activos.</p>
           ) : (
             <>
@@ -571,7 +716,7 @@ export function PagosResumenPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>{tabTipo === 'propiedad' ? 'Propiedad' : 'Auto'}</th>
+                      <th>{tabTipo === 'auto' ? 'Auto' : 'Propiedad'}</th>
                       {mesesMatriz.map((mes) => (
                         <th key={mes.key}>{mes.label}</th>
                       ))}
@@ -582,14 +727,17 @@ export function PagosResumenPage() {
                       <tr key={fila.key}>
                         <td>{fila.link ? <Link to={fila.link}>{fila.label}</Link> : fila.label}</td>
                         {mesesMatriz.map((mes) => {
-                          const estadoCelda = calcularEstadoCelda(
-                            mes.key,
-                            fila.fechaEntrega,
-                            fila.montoArriendo,
-                            fila.pagos,
-                            hoy,
-                            fila.diaPago,
-                          );
+                          const estadoCelda =
+                            tabTipo === 'servicios'
+                              ? calcularEstadoCeldaServicios(mes.key, fila.fechaEntrega, fila.pagos, hoy)
+                              : calcularEstadoCelda(
+                                  mes.key,
+                                  fila.fechaEntrega,
+                                  fila.montoArriendo,
+                                  fila.pagos,
+                                  hoy,
+                                  fila.diaPago,
+                                );
                           const config = CELDA_CONFIG[estadoCelda];
                           const esNa = estadoCelda === 'na';
                           return (
@@ -646,9 +794,21 @@ export function PagosResumenPage() {
 
       {tabTipo === 'tag' && (
         <section>
-          <h2>TAG</h2>
+          <div className="page-header">
+            <h2>TAG</h2>
+            {filtroTagCelda && (
+              <button type="button" className="link-button" onClick={() => setFiltroTagCelda(null)}>
+                Quitar filtro ({autoLabel(filtroTagCelda.autoId)},{' '}
+                {labelMes(filtroTagCelda.mesKey)})
+              </button>
+            )}
+          </div>
           {tagPagos.length === 0 ? (
-            <p className="empty-state">Sin cobros de TAG registrados.</p>
+            <p className="empty-state">
+              {filtroTagCelda
+                ? 'Sin cobros de TAG para ese auto en ese mes.'
+                : 'Sin cobros de TAG registrados.'}
+            </p>
           ) : (
             <div className="table-wrap">
               <table className="table">
