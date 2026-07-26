@@ -143,7 +143,7 @@ export function PropiedadesListPage() {
   const [arrastrandoDocumento, setArrastrandoDocumento] = useState(false);
   const [documentosPendientes, setDocumentosPendientes] = useState<DocumentoPendiente[]>([]);
 
-  const [sortField, setSortField] = useState<CampoOrdenable | null>(null);
+  const [sortField, setSortField] = useState<CampoOrdenable | null>('direccion');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const [editingCell, setEditingCell] = useState<{ id: string; campo: CampoCelda } | null>(null);

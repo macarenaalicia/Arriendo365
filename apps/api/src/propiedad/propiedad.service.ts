@@ -90,7 +90,7 @@ export class PropiedadService {
     return this.prisma.propiedad.create({
       data: {
         ...datos,
-        rol: `${datos.rol} (copia)`,
+        numero: `${datos.numero} (copia)`,
         organizacionId: this.tenant.organizacionId,
         proveedores: {
           create: proveedores.map(({ id: _pid, propiedadId: _propiedadId, ...p }) => p),
