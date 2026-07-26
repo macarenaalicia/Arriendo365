@@ -38,6 +38,10 @@ enum TipoPropiedad {
   DEPARTAMENTO
   HABITACION
   LOFT
+  // Terreno cercado con varias casas independientes adentro (cada una con
+  // su propia dirección, arriendo y proveedores). Siempre es de "primer
+  // nivel": no puede pertenecer a otra propiedad.
+  VECINDAD
   TERRENO
 }
 
@@ -295,14 +299,19 @@ model Propiedad {
   calle                  String
   numero                 String
   numeroDepartamento     String?
-  // Solo aplica cuando tipo = HABITACION o LOFT: identifica la pieza dentro
-  // de la propiedad (ej. "1", "2", "A", "B") cuando se arrienda por partes.
+  // Identifica la unidad dentro de su propiedad madre cuando corresponde:
+  // el número/letra de la habitación o loft (obligatorio en esos tipos), o
+  // el identificador de la casa dentro de una vecindad (ej. "Casa A").
   numeroHabitacion       String?
-  // Solo aplica cuando tipo = HABITACION o LOFT: a qué propiedad (casa,
-  // depto, etc.) pertenece esta pieza arrendable. Esa propiedad "madre" es
-  // la dueña de las cuentas de proveedores (agua/luz/gas) — las piezas no
-  // tienen las suyas propias, las comparten. Una propiedad madre no puede
-  // tener a su vez una madre (solo 2 niveles).
+  // A qué propiedad madre pertenece esta propiedad. Dos casos:
+  // - HABITACION/LOFT (obligatorio): la madre (una CASA o DEPARTAMENTO) es
+  //   la dueña de las cuentas de proveedores (agua/luz/gas) — la pieza no
+  //   tiene las suyas propias, las comparte.
+  // - CASA/DEPARTAMENTO (opcional): la madre es una VECINDAD que solo
+  //   agrupa varias casas/deptos independientes de un mismo terreno; cada
+  //   una mantiene sus propias cuentas de proveedores.
+  // Una propiedad madre no puede tener a su vez una madre (máximo 2
+  // niveles) — VECINDAD y TERRENO nunca pueden tener madre.
   propiedadPadreId       String?
   propiedadPadre         Propiedad?      @relation("PropiedadJerarquia", fields: [propiedadPadreId], references: [id])
   piezas                 Propiedad[]     @relation("PropiedadJerarquia")

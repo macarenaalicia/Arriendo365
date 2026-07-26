@@ -6,7 +6,13 @@ export type EstadoArriendo = 'ACTIVO' | 'INACTIVO' | 'TERMINADO';
 
 export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ATRASADO' | 'RECHAZADO';
 
-export type TipoPropiedad = 'CASA' | 'DEPARTAMENTO' | 'HABITACION' | 'LOFT' | 'TERRENO';
+export type TipoPropiedad =
+  | 'CASA'
+  | 'DEPARTAMENTO'
+  | 'HABITACION'
+  | 'LOFT'
+  | 'VECINDAD'
+  | 'TERRENO';
 
 export type EstadoPropiedad = 'DISPONIBLE' | 'ARRENDADA' | 'EN_MANTENCION' | 'USUFRUCTO';
 

@@ -25,7 +25,9 @@ export class ProveedorService {
 
   async create(propiedadId: string, dto: CreateProveedorDto) {
     const propiedad = await this.assertPropiedadEnOrganizacion(propiedadId);
-    if (propiedad.propiedadPadreId) {
+    // Solo habitación/loft comparten las cuentas de la madre. Una casa o
+    // depto dentro de una vecindad mantiene las suyas propias.
+    if (propiedad.propiedadPadreId && (propiedad.tipo === 'HABITACION' || propiedad.tipo === 'LOFT')) {
       throw new ConflictException(
         'Esta propiedad comparte proveedores con su propiedad madre: regístralos ahí.',
       );

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import type { Auto, PerfilPersona, Persona, Propiedad, RolUsuario, Usuario } from '../api/types';
-import { ddmmyyyyToIso, isoToDdmmyyyy } from '../lib/format';
+import { ddmmyyyyToIso, isoToDdmmyyyy, sufijoUnidadPropiedad } from '../lib/format';
 import { esRutValido } from '../lib/rut';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
@@ -574,8 +574,7 @@ export function PersonasListPage() {
                             onChange={() => toggleBienPropiedad(p.id)}
                           />
                           {p.calle} {p.numero}
-                          {p.numeroDepartamento ? ` depto ${p.numeroDepartamento}` : ''}
-                          {p.numeroHabitacion ? ` ${p.tipo === 'LOFT' ? 'loft' : 'hab.'} ${p.numeroHabitacion}` : ''}
+                          {sufijoUnidadPropiedad(p)}
                         </label>
                       ))}
                     </div>

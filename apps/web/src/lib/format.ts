@@ -2,6 +2,25 @@ export function formatEnumLabel(value: string): string {
   return value.replace(/_/g, ' ');
 }
 
+/**
+ * Sufijo para distinguir una propiedad de sus hermanas cuando comparte
+ * dirección con su propiedad madre: "depto 302", "hab. 1", "loft A",
+ * "casa B". Vacío si no aplica (propiedad independiente).
+ */
+export function sufijoUnidadPropiedad(propiedad: {
+  tipo: string;
+  numeroDepartamento: string | null;
+  numeroHabitacion: string | null;
+}): string {
+  if (propiedad.numeroDepartamento) return ` depto ${propiedad.numeroDepartamento}`;
+  if (propiedad.numeroHabitacion) {
+    if (propiedad.tipo === 'LOFT') return ` loft ${propiedad.numeroHabitacion}`;
+    if (propiedad.tipo === 'CASA') return ` casa ${propiedad.numeroHabitacion}`;
+    return ` hab. ${propiedad.numeroHabitacion}`;
+  }
+  return '';
+}
+
 export function formatMonto(monto: string | number): string {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(
     Number(monto),

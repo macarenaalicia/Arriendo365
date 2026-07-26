@@ -15,7 +15,7 @@ import type {
   Propiedad,
   Requerimiento,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, formatMonto } from '../lib/format';
+import { ddmmyyyyToIso, formatFecha, formatMonto, sufijoUnidadPropiedad } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
 import { calcularProximaAlza, ESTADO_ALZA_LABELS } from '../lib/alzas';
@@ -433,8 +433,7 @@ export function ArriendosListPage() {
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.calle} {p.numero}
-                      {p.numeroDepartamento ? ` depto ${p.numeroDepartamento}` : ''}
-                      {p.numeroHabitacion ? ` ${p.tipo === 'LOFT' ? 'loft' : 'hab.'} ${p.numeroHabitacion}` : ''}
+                      {sufijoUnidadPropiedad(p)}
                     </option>
                   ))}
               </select>

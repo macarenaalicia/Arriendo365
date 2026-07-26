@@ -13,21 +13,31 @@ export class PropiedadService {
     private readonly administradorBien: AdministradorBienService,
   ) {}
 
-  private async assertPadreValido(dto: { tipo: string; propiedadPadreId?: string }) {
-    const esPieza = dto.tipo === 'HABITACION' || dto.tipo === 'LOFT';
+  // HABITACION/LOFT siempre necesitan madre (una CASA o DEPARTAMENTO, cuyas
+  // cuentas de proveedores comparten). CASA/DEPARTAMENTO pueden tener madre
+  // opcionalmente (una VECINDAD que solo las agrupa, cada una mantiene sus
+  // propias cuentas). VECINDAD y TERRENO nunca tienen madre.
+  private readonly TIPOS_MADRE_OBLIGATORIA = ['HABITACION', 'LOFT'];
+  private readonly TIPOS_MADRE_OPCIONAL = ['CASA', 'DEPARTAMENTO'];
 
-    if (!esPieza) {
+  private async assertPadreValido(dto: { tipo: string; propiedadPadreId?: string }) {
+    const esObligatoria = this.TIPOS_MADRE_OBLIGATORIA.includes(dto.tipo);
+    const esOpcional = this.TIPOS_MADRE_OPCIONAL.includes(dto.tipo);
+
+    if (!esObligatoria && !esOpcional) {
       if (dto.propiedadPadreId) {
         throw new ConflictException(
-          'Solo una habitación o loft puede tener una propiedad madre.',
+          'Una vecindad o terreno no puede pertenecer a otra propiedad.',
         );
       }
       return;
     }
 
-    if (!dto.propiedadPadreId) {
+    if (esObligatoria && !dto.propiedadPadreId) {
       throw new ConflictException('Elige a qué propiedad pertenece esta habitación o loft.');
     }
+
+    if (!dto.propiedadPadreId) return;
 
     const padre = await this.prisma.propiedad.findFirst({
       where: { id: dto.propiedadPadreId, organizacionId: this.tenant.organizacionId },
@@ -37,8 +47,15 @@ export class PropiedadService {
     }
     if (padre.propiedadPadreId) {
       throw new ConflictException(
-        'La propiedad madre no puede ser a su vez una habitación o loft de otra propiedad.',
+        'La propiedad madre no puede ser a su vez una pieza de otra propiedad (máximo 2 niveles).',
       );
+    }
+
+    if (esObligatoria && padre.tipo !== 'CASA' && padre.tipo !== 'DEPARTAMENTO') {
+      throw new ConflictException('Una habitación o loft debe pertenecer a una casa o departamento.');
+    }
+    if (esOpcional && padre.tipo !== 'VECINDAD') {
+      throw new ConflictException('Una casa o departamento solo puede pertenecer a una vecindad.');
     }
   }
 
@@ -114,7 +131,7 @@ export class PropiedadService {
     });
     if (tienePiezas) {
       throw new ConflictException(
-        'No se puede eliminar una propiedad que tiene habitaciones o lofts asociados.',
+        'No se puede eliminar una propiedad que tiene otras propiedades asociadas (habitaciones, lofts o casas).',
       );
     }
 

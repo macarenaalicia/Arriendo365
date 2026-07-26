@@ -3,7 +3,7 @@ import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { EMPRESAS_POR_TIPO_PROVEEDOR } from '../api/types';
 import type { Documento, EstadoProveedor, Foto, Propiedad, Proveedor, TipoProveedor } from '../api/types';
-import { formatEnumLabel, formatFecha } from '../lib/format';
+import { formatEnumLabel, formatFecha, sufijoUnidadPropiedad } from '../lib/format';
 import { eliminarFoto, listarFotos, subirFoto } from '../lib/fotos';
 import { eliminarDocumento, listarDocumentos, subirDocumento } from '../lib/documentos';
 import { REGIONES, REGIONES_COMUNAS } from '../lib/chile';
@@ -32,8 +32,12 @@ const PROPIEDADES_TOUR_STEPS = [
   },
 ];
 
-const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'LOFT', 'TERRENO'] as const;
+const TIPOS = ['CASA', 'DEPARTAMENTO', 'HABITACION', 'LOFT', 'VECINDAD', 'TERRENO'] as const;
+// Habitación/loft siempre necesitan una madre (comparten sus proveedores).
 const TIPOS_PIEZA: (typeof TIPOS)[number][] = ['HABITACION', 'LOFT'];
+// Casa/depto pueden pertenecer opcionalmente a una vecindad, manteniendo
+// sus propias cuentas de proveedores.
+const TIPOS_MADRE_OPCIONAL: (typeof TIPOS)[number][] = ['CASA', 'DEPARTAMENTO'];
 const ESTADOS_PROPIEDAD = ['DISPONIBLE', 'ARRENDADA', 'EN_MANTENCION', 'USUFRUCTO'] as const;
 const MAX_FOTOS_PROPIEDAD = 10;
 
@@ -325,6 +329,7 @@ export function PropiedadesListPage() {
     setError(null);
 
     const esPieza = TIPOS_PIEZA.includes(form.tipo);
+    const esMadreOpcional = TIPOS_MADRE_OPCIONAL.includes(form.tipo);
     if (esPieza && !form.propiedadPadreId) {
       setError('Elige a qué propiedad pertenece esta habitación o loft.');
       return;
@@ -338,8 +343,15 @@ export function PropiedadesListPage() {
         numero: form.numero,
         numeroDepartamento:
           form.tipo === 'DEPARTAMENTO' && form.numeroDepartamento ? form.numeroDepartamento : undefined,
-        numeroHabitacion: esPieza && form.numeroHabitacion ? form.numeroHabitacion : undefined,
-        propiedadPadreId: esPieza ? form.propiedadPadreId : null,
+        numeroHabitacion:
+          (esPieza || (esMadreOpcional && form.propiedadPadreId)) && form.numeroHabitacion
+            ? form.numeroHabitacion
+            : undefined,
+        propiedadPadreId: esPieza
+          ? form.propiedadPadreId
+          : esMadreOpcional && form.propiedadPadreId
+            ? form.propiedadPadreId
+            : null,
         sector: form.sector || undefined,
         ciudad: form.ciudad,
         region: form.region,
@@ -578,12 +590,21 @@ export function PropiedadesListPage() {
   };
   const eliminarProveedorConfirmar = useConfirmarEliminar<string>(handleDeleteProveedor);
 
-  // Candidatas a "propiedad madre": nunca otra pieza, ni la propiedad que se
-  // está editando (no puede ser madre de sí misma).
+  // Candidatas a madre de una habitación/loft: casas o deptos de primer
+  // nivel (nunca otra pieza, nunca una vecindad, ni la propiedad que se
+  // está editando).
   const propiedadesPadreDisponibles = propiedades.filter(
-    (p) => !p.propiedadPadreId && p.id !== editingId,
+    (p) =>
+      !p.propiedadPadreId &&
+      p.id !== editingId &&
+      (p.tipo === 'CASA' || p.tipo === 'DEPARTAMENTO'),
+  );
+  // Candidatas a madre de una casa/depto: solo vecindades.
+  const vecindadesDisponibles = propiedades.filter(
+    (p) => !p.propiedadPadreId && p.id !== editingId && p.tipo === 'VECINDAD',
   );
   const esPiezaForm = TIPOS_PIEZA.includes(form.tipo);
+  const esMadreOpcionalForm = TIPOS_MADRE_OPCIONAL.includes(form.tipo);
   const propiedadPadreForm = propiedades.find((p) => p.id === form.propiedadPadreId);
 
   return (
@@ -690,11 +711,50 @@ export function PropiedadesListPage() {
                     {propiedadesPadreDisponibles.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.calle} {p.numero}
-                        {p.numeroDepartamento ? ` depto ${p.numeroDepartamento}` : ''}
+                        {sufijoUnidadPropiedad(p)}
                       </option>
                     ))}
                   </select>
                 </label>
+              </>
+            )}
+            {esMadreOpcionalForm && (
+              <>
+                <label>
+                  Pertenece a una vecindad (opcional)
+                  <select
+                    value={form.propiedadPadreId}
+                    onChange={(e) => {
+                      const padre = vecindadesDisponibles.find((p) => p.id === e.target.value);
+                      setForm({
+                        ...form,
+                        propiedadPadreId: e.target.value,
+                        calle: padre?.calle ?? form.calle,
+                        numero: padre?.numero ?? form.numero,
+                        sector: padre?.sector ?? form.sector,
+                        ciudad: padre?.ciudad ?? form.ciudad,
+                        region: padre?.region ?? form.region,
+                      });
+                    }}
+                  >
+                    <option value="">Es independiente (no pertenece a ninguna)</option>
+                    {vecindadesDisponibles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.calle} {p.numero}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {form.tipo === 'CASA' && form.propiedadPadreId && (
+                  <label>
+                    Identificador de la casa
+                    <input
+                      placeholder="A, B, C… o 1, 2, 3…"
+                      value={form.numeroHabitacion}
+                      onChange={(e) => setForm({ ...form, numeroHabitacion: e.target.value })}
+                    />
+                  </label>
+                )}
               </>
             )}
             <label>
@@ -1392,8 +1452,7 @@ export function PropiedadesListPage() {
                     <td style={propiedad.propiedadPadreId ? { paddingLeft: '1.75rem' } : undefined}>
                       {propiedad.propiedadPadreId ? '↳ ' : ''}
                       {propiedad.calle} {propiedad.numero}
-                      {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
-                      {propiedad.numeroHabitacion ? ` ${propiedad.tipo === 'LOFT' ? 'loft' : 'hab.'} ${propiedad.numeroHabitacion}` : ''}
+                      {sufijoUnidadPropiedad(propiedad)}
                     </td>
                     <td>
                       {propiedad.sector ? `${propiedad.sector}, ` : ''}

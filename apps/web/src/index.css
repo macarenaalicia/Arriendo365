@@ -1702,6 +1702,11 @@ section + section {
   color: #475569;
 }
 
+.badge--vecindad {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
 .badge--terreno {
   background: #ecfccb;
   color: #3f6212;

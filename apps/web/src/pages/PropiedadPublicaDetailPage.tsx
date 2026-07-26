@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { PropiedadPublica } from '../api/types';
-import { formatMonto } from '../lib/format';
+import { formatMonto, sufijoUnidadPropiedad } from '../lib/format';
 
 const TIPO_LABELS: Record<string, string> = {
   CASA: 'Casa',
   DEPARTAMENTO: 'Departamento',
   HABITACION: 'Habitación',
   LOFT: 'Loft',
+  VECINDAD: 'Vecindad',
   TERRENO: 'Terreno',
 };
 
@@ -58,8 +59,7 @@ export function PropiedadPublicaDetailPage() {
       <div className="page-header">
         <h1>
           {propiedad.calle} {propiedad.numero}
-          {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
-          {propiedad.numeroHabitacion ? ` hab. ${propiedad.numeroHabitacion}` : ''}
+          {sufijoUnidadPropiedad(propiedad)}
         </h1>
         <span className="badge">{TIPO_LABELS[propiedad.tipo] ?? propiedad.tipo}</span>
       </div>
