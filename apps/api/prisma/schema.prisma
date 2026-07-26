@@ -294,6 +294,9 @@ model Propiedad {
   calle                  String
   numero                 String
   numeroDepartamento     String?
+  // Solo aplica cuando tipo = HABITACION: identifica la pieza dentro de la
+  // propiedad (ej. "1", "2", "A", "B") cuando se arrienda por habitaciones.
+  numeroHabitacion       String?
   sector                 String?
   ciudad                 String
   region                 String

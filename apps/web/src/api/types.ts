@@ -28,6 +28,7 @@ export interface Propiedad {
   calle: string;
   numero: string;
   numeroDepartamento: string | null;
+  numeroHabitacion: string | null;
   sector: string | null;
   ciudad: string;
   region: string;
@@ -69,6 +70,7 @@ export interface PropiedadPublica {
   calle: string;
   numero: string;
   numeroDepartamento: string | null;
+  numeroHabitacion: string | null;
   sector: string | null;
   ciudad: string;
   region: string;

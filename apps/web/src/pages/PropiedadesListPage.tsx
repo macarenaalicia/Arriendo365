@@ -54,6 +54,7 @@ const FORM_INICIAL = {
   calle: '',
   numero: '',
   numeroDepartamento: '',
+  numeroHabitacion: '',
   sector: '',
   ciudad: '',
   region: '',
@@ -264,6 +265,7 @@ export function PropiedadesListPage() {
       calle: propiedad.calle,
       numero: propiedad.numero,
       numeroDepartamento: propiedad.numeroDepartamento ?? '',
+      numeroHabitacion: propiedad.numeroHabitacion ?? '',
       sector: propiedad.sector ?? '',
       ciudad: propiedad.ciudad,
       region: propiedad.region,
@@ -312,6 +314,8 @@ export function PropiedadesListPage() {
         numero: form.numero,
         numeroDepartamento:
           form.tipo === 'DEPARTAMENTO' && form.numeroDepartamento ? form.numeroDepartamento : undefined,
+        numeroHabitacion:
+          form.tipo === 'HABITACION' && form.numeroHabitacion ? form.numeroHabitacion : undefined,
         sector: form.sector || undefined,
         ciudad: form.ciudad,
         region: form.region,
@@ -617,6 +621,16 @@ export function PropiedadesListPage() {
                 <input
                   value={form.numeroDepartamento}
                   onChange={(e) => setForm({ ...form, numeroDepartamento: e.target.value })}
+                />
+              </label>
+            )}
+            {form.tipo === 'HABITACION' && (
+              <label>
+                Habitación
+                <input
+                  placeholder="1, 2, 3… o A, B, C…"
+                  value={form.numeroHabitacion}
+                  onChange={(e) => setForm({ ...form, numeroHabitacion: e.target.value })}
                 />
               </label>
             )}
@@ -1296,6 +1310,7 @@ export function PropiedadesListPage() {
                     <td>
                       {propiedad.calle} {propiedad.numero}
                       {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
+                      {propiedad.numeroHabitacion ? ` hab. ${propiedad.numeroHabitacion}` : ''}
                     </td>
                     <td>
                       {propiedad.sector ? `${propiedad.sector}, ` : ''}

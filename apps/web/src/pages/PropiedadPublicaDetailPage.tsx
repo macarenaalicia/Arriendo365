@@ -58,6 +58,7 @@ export function PropiedadPublicaDetailPage() {
         <h1>
           {propiedad.calle} {propiedad.numero}
           {propiedad.numeroDepartamento ? ` depto ${propiedad.numeroDepartamento}` : ''}
+          {propiedad.numeroHabitacion ? ` hab. ${propiedad.numeroHabitacion}` : ''}
         </h1>
         <span className="badge">{TIPO_LABELS[propiedad.tipo] ?? propiedad.tipo}</span>
       </div>

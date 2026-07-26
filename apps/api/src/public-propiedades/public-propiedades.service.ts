@@ -7,6 +7,7 @@ const SELECT_PROPIEDAD_PUBLICA = {
   calle: true,
   numero: true,
   numeroDepartamento: true,
+  numeroHabitacion: true,
   sector: true,
   ciudad: true,
   region: true,

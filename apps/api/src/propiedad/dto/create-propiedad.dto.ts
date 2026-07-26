@@ -25,6 +25,10 @@ export class CreatePropiedadDto {
 
   @IsOptional()
   @IsString()
+  numeroHabitacion?: string;
+
+  @IsOptional()
+  @IsString()
   sector?: string;
 
   @IsString()
