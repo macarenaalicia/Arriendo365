@@ -1258,6 +1258,8 @@ export function PagosResumenPage() {
         </div>
       )}
 
+      {esTabPago && <hr className="section-divider" />}
+
       {tabTipo === 'tag' && (
         <section>
           <div className="page-header">
