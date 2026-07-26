@@ -89,13 +89,24 @@ export class ArriendoPropiedadService {
     }
   }
 
+  // Al crear/terminar un contrato, la propiedad refleja sola si está
+  // disponible o arrendada — nadie tiene que acordarse de cambiarla a mano.
+  private async sincronizarEstadoPropiedad(propiedadId: string, estadoArriendo: string) {
+    if (estadoArriendo === 'ACTIVO') {
+      await this.prisma.propiedad.update({ where: { id: propiedadId }, data: { estado: 'ARRENDADA' } });
+    } else if (estadoArriendo === 'TERMINADO' || estadoArriendo === 'INACTIVO') {
+      await this.prisma.propiedad.update({ where: { id: propiedadId }, data: { estado: 'DISPONIBLE' } });
+    }
+  }
+
   async create(dto: CreateArriendoPropiedadDto) {
     await this.assertPropiedadEnOrganizacion(dto.propiedadId);
     await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
     if (dto.codeudorId) {
       await this.assertPersonaEnOrganizacion(dto.codeudorId);
     }
-    if ((dto.estado ?? 'ACTIVO') === 'ACTIVO') {
+    const estadoDestino = dto.estado ?? 'ACTIVO';
+    if (estadoDestino === 'ACTIVO') {
       await this.assertSinArriendoActivo(dto.propiedadId);
     }
 
@@ -103,6 +114,7 @@ export class ArriendoPropiedadService {
       data: dto,
       include: DETALLE_INCLUDE,
     });
+    await this.sincronizarEstadoPropiedad(dto.propiedadId, estadoDestino);
     return proyectarReajuste(arriendo);
   }
 
@@ -186,12 +198,20 @@ export class ArriendoPropiedadService {
       data: dto,
       include: DETALLE_INCLUDE,
     });
+
+    if (dto.estado !== undefined && dto.estado !== actual.estado) {
+      await this.sincronizarEstadoPropiedad(dto.propiedadId ?? actual.propiedadId, estadoDestino);
+    }
+
     return proyectarReajuste(actualizado);
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const arriendo = await this.findOne(id);
     await this.prisma.arriendoPropiedad.delete({ where: { id } });
+    if (arriendo.estado === 'ACTIVO') {
+      await this.sincronizarEstadoPropiedad(arriendo.propiedadId, 'TERMINADO');
+    }
   }
 
   async aplicarReajusteIpc(id: string) {

@@ -46,14 +46,27 @@ export class ArriendoAutoService {
     }
   }
 
+  // Al crear/terminar un contrato, el auto refleja solo si está disponible
+  // o arrendado — igual que con propiedades.
+  private async sincronizarEstadoAuto(autoId: string, estadoArriendo: string) {
+    if (estadoArriendo === 'ACTIVO') {
+      await this.prisma.auto.update({ where: { id: autoId }, data: { estado: 'ARRENDADO' } });
+    } else if (estadoArriendo === 'TERMINADO' || estadoArriendo === 'INACTIVO') {
+      await this.prisma.auto.update({ where: { id: autoId }, data: { estado: 'DISPONIBLE' } });
+    }
+  }
+
   async create(dto: CreateArriendoAutoDto) {
     await this.assertAutoEnOrganizacion(dto.autoId);
     await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
-    if ((dto.estado ?? 'ACTIVO') === 'ACTIVO') {
+    const estadoDestino = dto.estado ?? 'ACTIVO';
+    if (estadoDestino === 'ACTIVO') {
       await this.assertSinArriendoActivo(dto.autoId);
     }
 
-    return this.prisma.arriendoAuto.create({ data: dto, include: DETALLE_INCLUDE });
+    const arriendo = await this.prisma.arriendoAuto.create({ data: dto, include: DETALLE_INCLUDE });
+    await this.sincronizarEstadoAuto(dto.autoId, estadoDestino);
+    return arriendo;
   }
 
   async findAll(query: FindArriendosAutoDto) {
@@ -107,11 +120,24 @@ export class ArriendoAutoService {
       await this.assertSinArriendoActivo(dto.autoId ?? actual.autoId, id);
     }
 
-    return this.prisma.arriendoAuto.update({ where: { id }, data: dto, include: DETALLE_INCLUDE });
+    const actualizado = await this.prisma.arriendoAuto.update({
+      where: { id },
+      data: dto,
+      include: DETALLE_INCLUDE,
+    });
+
+    if (dto.estado !== undefined && dto.estado !== actual.estado) {
+      await this.sincronizarEstadoAuto(dto.autoId ?? actual.autoId, estadoDestino);
+    }
+
+    return actualizado;
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const arriendo = await this.findOne(id);
     await this.prisma.arriendoAuto.delete({ where: { id } });
+    if (arriendo.estado === 'ACTIVO') {
+      await this.sincronizarEstadoAuto(arriendo.autoId, 'TERMINADO');
+    }
   }
 }
