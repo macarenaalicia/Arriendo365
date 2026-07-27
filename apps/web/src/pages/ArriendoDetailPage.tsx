@@ -95,6 +95,8 @@ const PERIODOS_ALZA = ['MENSUAL', 'TRIMESTRAL', 'SEMESTRAL', 'ANUAL', 'SIN REAJU
 const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
 
 const CONDICIONES_FORM_INICIAL = {
+  arrendatarioId: '',
+  codeudorId: '',
   montoArriendo: '',
   fechaPago: '',
   fechaEntrega: '',
@@ -299,6 +301,8 @@ export function ArriendoDetailPage() {
   const abrirEdicionCondiciones = () => {
     if (!arriendo) return;
     setCondicionesForm({
+      arrendatarioId: arriendo.arrendatarioId,
+      codeudorId: arriendo.codeudorId ?? '',
       montoArriendo: arriendo.montoArriendo,
       fechaPago: String(arriendo.fechaPago),
       fechaEntrega: isoToDdmmyyyy(arriendo.fechaEntrega),
@@ -316,6 +320,11 @@ export function ArriendoDetailPage() {
     if (!id) return;
     setCondicionesError(null);
 
+    if (!condicionesForm.arrendatarioId) {
+      setCondicionesError('Elige un arrendatario.');
+      return;
+    }
+
     const fechaEntrega = ddmmyyyyToIso(condicionesForm.fechaEntrega);
     if (!fechaEntrega) {
       setCondicionesError('Fecha de entrega inválida, usa el formato dd/mm/aaaa.');
@@ -325,6 +334,8 @@ export function ArriendoDetailPage() {
     setSavingCondiciones(true);
     try {
       await api.patch(`/arriendos-propiedad/${id}`, {
+        arrendatarioId: condicionesForm.arrendatarioId,
+        codeudorId: condicionesForm.codeudorId || null,
         montoArriendo: Number(condicionesForm.montoArriendo),
         fechaPago: Number(condicionesForm.fechaPago),
         fechaEntrega,
@@ -861,6 +872,45 @@ export function ArriendoDetailPage() {
         <Modal titulo="Editar condiciones" onClose={cerrarCondicionesForm}>
           <form className="inline-form" onSubmit={handleSubmitCondiciones}>
             <div className="inline-form__grid">
+              <label>
+                Arrendatario
+                <select
+                  required
+                  value={condicionesForm.arrendatarioId}
+                  onChange={(e) =>
+                    setCondicionesForm({ ...condicionesForm, arrendatarioId: e.target.value })
+                  }
+                >
+                  <option value="">Elige una persona…</option>
+                  {personas
+                    .filter((p) => p.tipoPersona === 'ARRENDATARIO')
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombreCompleto}
+                        {p.rut ? ` (${p.rut})` : ''}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Codeudor (opcional)
+                <select
+                  value={condicionesForm.codeudorId}
+                  onChange={(e) =>
+                    setCondicionesForm({ ...condicionesForm, codeudorId: e.target.value })
+                  }
+                >
+                  <option value="">Sin codeudor</option>
+                  {personas
+                    .filter((p) => p.tipoPersona === 'CODEUDOR')
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombreCompleto}
+                        {p.rut ? ` (${p.rut})` : ''}
+                      </option>
+                    ))}
+                </select>
+              </label>
               <label>
                 Monto arriendo
                 <input
