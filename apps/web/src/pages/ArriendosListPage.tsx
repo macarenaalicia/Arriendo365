@@ -300,6 +300,16 @@ export function ArriendosListPage() {
     }
   };
 
+  const arriendosOrdenados = [...arriendos].sort((a, b) =>
+    `${a.propiedad.calle} ${a.propiedad.numero}`.localeCompare(
+      `${b.propiedad.calle} ${b.propiedad.numero}`,
+    ),
+  );
+
+  const arriendosAutoOrdenados = [...arriendosAuto].sort((a, b) =>
+    a.auto.patente.localeCompare(b.auto.patente),
+  );
+
   const arriendosConAlzaPendiente = esStaff
     ? arriendos.filter((a) => {
         if (a.estado !== 'ACTIVO') return false;
@@ -602,7 +612,7 @@ export function ArriendosListPage() {
                 </tr>
               </thead>
               <tbody>
-                {arriendosAuto.map((arriendoAuto) => {
+                {arriendosAutoOrdenados.map((arriendoAuto) => {
                   const alzaAuto =
                     esStaff && arriendoAuto.estado === 'ACTIVO'
                       ? calcularProximaAlza(arriendoAuto.fechaEntrega, arriendoAuto.periodoAlza)
@@ -695,7 +705,7 @@ export function ArriendosListPage() {
             </tr>
           </thead>
           <tbody>
-            {arriendos.map((arriendo) => {
+            {arriendosOrdenados.map((arriendo) => {
               const alza =
                 esStaff && arriendo.estado === 'ACTIVO'
                   ? calcularProximaAlza(arriendo.fechaEntrega, arriendo.periodoAlza)
