@@ -191,8 +191,10 @@ function calcularEstadoCelda(
       // Si el día de pago pactado (ej. 31) no existe en este mes (ej.
       // febrero), se corre al último día del mes — igual que al calcular la
       // fecha comprometida real (ver periodoValorAFecha en lib/periodos.ts).
+      // Por ley hay plazo hasta el día 5 para pagar el arriendo, aunque el
+      // día pactado sea antes — no se marca "atrasado" antes de esa fecha.
       const ultimoDiaDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-      const diaPagoEfectivo = Math.min(diaPago, ultimoDiaDelMes);
+      const diaPagoEfectivo = Math.min(Math.max(diaPago, 5), ultimoDiaDelMes);
       return hoy.getDate() < diaPagoEfectivo ? 'pendiente' : 'atrasado';
     }
     return 'atrasado';

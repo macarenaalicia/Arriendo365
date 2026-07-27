@@ -15,13 +15,14 @@ import type {
   Propiedad,
   Requerimiento,
 } from '../api/types';
-import { ddmmyyyyToIso, formatFecha, formatMonto, sufijoUnidadPropiedad } from '../lib/format';
+import { ddmmyyyyToIso, formatMonto, sufijoUnidadPropiedad } from '../lib/format';
 import { DateInput } from '../components/DateInput';
 import { Modal } from '../components/Modal';
-import { calcularProximaAlza, ESTADO_ALZA_LABELS } from '../lib/alzas';
+import { calcularProximaAlza } from '../lib/alzas';
 import { periodoValorAFecha } from '../lib/periodos';
 import { OnboardingTour } from '../components/OnboardingTour';
 import { useOnboardingTour } from '../lib/useOnboardingTour';
+import { IconCheck, IconReloj } from '../components/icons';
 
 const ARRIENDOS_TOUR_STEPS = [
   {
@@ -91,7 +92,11 @@ function calcularEstadoMesActual(
     return { claseBadge: 'abono', label: 'Abono recibido este mes' };
   }
 
-  const fechaVencimiento = periodoValorAFecha(mesActual, arriendo.fechaPago);
+  // Por ley, el arrendatario tiene plazo hasta el día 5 del mes para pagar
+  // el arriendo, aunque el día de pago pactado sea antes — no se marca
+  // "atrasado" hasta que pase ese plazo legal.
+  const diaVencimiento = categoria === 'ARRIENDO' ? Math.max(arriendo.fechaPago, 5) : arriendo.fechaPago;
+  const fechaVencimiento = periodoValorAFecha(mesActual, diaVencimiento);
   const hoyIso = hoy.toISOString().slice(0, 10);
   if (hoyIso > fechaVencimiento) {
     return { claseBadge: 'atrasado', label: 'Sin registrar' };
@@ -607,20 +612,11 @@ export function ArriendosListPage() {
                   <th>Medio pago</th>
                   <th>Kilometraje de entrega</th>
                   <th>Kilometraje actual</th>
-                  {esStaff && <th>Reajuste</th>}
                   <th>{esStaff ? 'Detalle' : 'Pagos y mantenciones'}</th>
                 </tr>
               </thead>
               <tbody>
                 {arriendosAutoOrdenados.map((arriendoAuto) => {
-                  const alzaAuto =
-                    esStaff && arriendoAuto.estado === 'ACTIVO'
-                      ? calcularProximaAlza(arriendoAuto.fechaEntrega, arriendoAuto.periodoAlza)
-                      : null;
-                  const alzaAutoVisible =
-                    alzaAuto && (alzaAuto.estado === 'vencido' || alzaAuto.estado === 'proximo')
-                      ? alzaAuto
-                      : null;
                   return (
                     <tr key={arriendoAuto.id}>
                       <td>{arriendoAuto.auto.patente}</td>
@@ -636,18 +632,6 @@ export function ArriendosListPage() {
                       </td>
                       <td>{arriendoAuto.kilometrajeEntrega.toLocaleString('es-CL')} km</td>
                       <td>{arriendoAuto.auto.kilometraje.toLocaleString('es-CL')} km</td>
-                      {esStaff && (
-                        <td>
-                          {alzaAutoVisible ? (
-                            <span className={`badge badge--${alzaAutoVisible.estado}`}>
-                              {ESTADO_ALZA_LABELS[alzaAutoVisible.estado]} ·{' '}
-                              {formatFecha(alzaAutoVisible.fechaIso)}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      )}
                       <td>
                         {esStaff ? (
                           <Link to={`/autos/${arriendoAuto.autoId}`}>Ver auto</Link>
@@ -699,19 +683,18 @@ export function ArriendosListPage() {
               <th>Monto</th>
               <th>Medio pago</th>
               {esStaff && <th>Arriendo</th>}
-              {esStaff && <th>Servicios básicos</th>}
+              {esStaff && (
+                <th>
+                  Servicios
+                  <br />
+                  básicos
+                </th>
+              )}
               {esStaff && <th>Requerimientos</th>}
-              {esStaff && <th>Reajuste</th>}
             </tr>
           </thead>
           <tbody>
             {arriendosOrdenados.map((arriendo) => {
-              const alza =
-                esStaff && arriendo.estado === 'ACTIVO'
-                  ? calcularProximaAlza(arriendo.fechaEntrega, arriendo.periodoAlza)
-                  : null;
-              const alzaVisible =
-                alza && (alza.estado === 'vencido' || alza.estado === 'proximo') ? alza : null;
               const estadoArriendo = esStaff
                 ? calcularEstadoMesActual(arriendo, pagos, 'ARRIENDO')
                 : null;
@@ -743,10 +726,15 @@ export function ArriendosListPage() {
                   </td>
                   {esStaff && (
                     <td>
-                      <Link to={`/arriendos/${arriendo.id}#pagos-arriendo`}>
+                      <Link
+                        to={`/arriendos/${arriendo.id}#pagos-arriendo`}
+                        title={estadoArriendo?.label}
+                      >
                         {estadoArriendo ? (
-                          <span className={`badge badge--${estadoArriendo.claseBadge}`}>
-                            {estadoArriendo.label}
+                          <span
+                            className={`celda-pago celda-pago--${estadoArriendo.claseBadge === 'pagado' ? 'pagado' : 'pendiente'}`}
+                          >
+                            {estadoArriendo.claseBadge === 'pagado' ? <IconCheck /> : <IconReloj />}
                           </span>
                         ) : (
                           '—'
@@ -756,10 +744,15 @@ export function ArriendosListPage() {
                   )}
                   {esStaff && (
                     <td>
-                      <Link to={`/arriendos/${arriendo.id}#pagos-servicios`}>
+                      <Link
+                        to={`/arriendos/${arriendo.id}#pagos-servicios`}
+                        title={estadoServicios?.label}
+                      >
                         {estadoServicios ? (
-                          <span className={`badge badge--${estadoServicios.claseBadge}`}>
-                            {estadoServicios.label}
+                          <span
+                            className={`celda-pago celda-pago--${estadoServicios.claseBadge === 'pagado' ? 'pagado' : 'pendiente'}`}
+                          >
+                            {estadoServicios.claseBadge === 'pagado' ? <IconCheck /> : <IconReloj />}
                           </span>
                         ) : (
                           '—'
@@ -775,18 +768,6 @@ export function ArriendosListPage() {
                         </span>
                       ) : (
                         <span className="empty-state">Sin pendientes</span>
-                      )}
-                    </td>
-                  )}
-                  {esStaff && (
-                    <td>
-                      {alzaVisible ? (
-                        <span className={`badge badge--${alzaVisible.estado}`}>
-                          {ESTADO_ALZA_LABELS[alzaVisible.estado]} ·{' '}
-                          {formatFecha(alzaVisible.fechaIso)}
-                        </span>
-                      ) : (
-                        '—'
                       )}
                     </td>
                   )}
