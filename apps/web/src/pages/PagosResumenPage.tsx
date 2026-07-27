@@ -310,6 +310,8 @@ interface FilaMatriz {
   montoArriendo: number;
   diaPago: number | null;
   pagos: Pago[];
+  /** Medio de pago ya configurado en el arriendo (efectivo o cuenta bancaria) — evita preguntarlo de nuevo al registrar un pago rápido. */
+  medioPago: string | null;
 }
 
 interface FilaMatrizTag {
@@ -344,7 +346,6 @@ export function PagosResumenPage() {
   );
   const [pagoRapidoForm, setPagoRapidoForm] = useState({
     fecha: '',
-    medioPago: '',
     esAbono: false,
     monto: '',
   });
@@ -536,13 +537,13 @@ export function PagosResumenPage() {
 
   const cerrarPagoRapido = () => {
     setCeldaSeleccionada(null);
-    setPagoRapidoForm({ fecha: '', medioPago: '', esAbono: false, monto: '' });
+    setPagoRapidoForm({ fecha: '', esAbono: false, monto: '' });
     setPagoRapidoError(null);
   };
 
   const abrirPagoRapido = (fila: FilaMatriz, mesKey: string) => {
     setCeldaSeleccionada({ fila, mesKey });
-    setPagoRapidoForm({ fecha: hoyDdmmyyyy(), medioPago: '', esAbono: false, monto: '' });
+    setPagoRapidoForm({ fecha: hoyDdmmyyyy(), esAbono: false, monto: '' });
     setPagoRapidoError(null);
   };
 
@@ -570,10 +571,6 @@ export function PagosResumenPage() {
       setPagoRapidoError('Fecha inválida, usa el formato dd/mm/aaaa.');
       return;
     }
-    if (!pagoRapidoForm.medioPago) {
-      setPagoRapidoError('Elige el medio de pago.');
-      return;
-    }
     const monto = pagoRapidoForm.esAbono ? Number(pagoRapidoForm.monto) : saldoPendienteMesSeleccionado;
     if (!monto || monto <= 0) {
       setPagoRapidoError('Ingresa un monto válido.');
@@ -595,7 +592,7 @@ export function PagosResumenPage() {
         periodo: fechaPago,
         fechaComprometida,
         monto,
-        medioPago: pagoRapidoForm.medioPago,
+        medioPago: celdaSeleccionada.fila.medioPago ?? undefined,
         esAbono: calcularEsAbono(monto, celdaSeleccionada.fila.montoArriendo, pagosDelMesSeleccionada),
         categoria: 'ARRIENDO',
       });
@@ -726,6 +723,7 @@ export function PagosResumenPage() {
               fechaEntrega: a.fechaEntrega,
               montoArriendo: Number(a.montoArriendo),
               diaPago: a.fechaPago,
+              medioPago: a.pagaEnEfectivo ? 'Efectivo' : a.cuentaBancaria ? 'Transferencia' : null,
               pagos: pagos.filter(
                 (p) =>
                   p.arriendoTipo === 'propiedad' &&
@@ -744,6 +742,7 @@ export function PagosResumenPage() {
               fechaEntrega: a.fechaEntrega,
               montoArriendo: Number(a.montoArriendo),
               diaPago: null,
+              medioPago: a.pagaEnEfectivo ? 'Efectivo' : a.cuentaBancaria ? 'Transferencia' : null,
               pagos: pagos.filter(
                 (p) => p.arriendoTipo === 'auto' && p.arriendoId === a.id && p.categoria === 'ARRIENDO',
               ),
@@ -1122,21 +1121,6 @@ export function PagosResumenPage() {
                     required
                   />
                 </label>
-                <label>
-                  Medio de pago
-                  <select
-                    required
-                    value={pagoRapidoForm.medioPago}
-                    onChange={(e) => setPagoRapidoForm({ ...pagoRapidoForm, medioPago: e.target.value })}
-                  >
-                    <option value="">Selecciona…</option>
-                    {MEDIOS_PAGO.map((medio) => (
-                      <option key={medio} value={medio}>
-                        {medio}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
 
               {!pagoRapidoForm.esAbono ? (
@@ -1149,7 +1133,7 @@ export function PagosResumenPage() {
                   <p>
                     <button
                       type="button"
-                      className="link-button"
+                      className="button-secondary"
                       onClick={() =>
                         setPagoRapidoForm({
                           ...pagoRapidoForm,
@@ -1181,7 +1165,7 @@ export function PagosResumenPage() {
                     </button>
                     <button
                       type="button"
-                      className="link-button"
+                      className="button-secondary"
                       onClick={() => setPagoRapidoForm({ ...pagoRapidoForm, esAbono: false, monto: '' })}
                     >
                       Cancelar, fue pago completo

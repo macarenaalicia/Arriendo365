@@ -893,6 +893,20 @@ section + section {
   cursor: default;
 }
 
+/* Acción secundaria dentro de un formulario (ej. "fue un abono parcial" bajo
+   el botón principal) — gris para no competir visualmente con la acción
+   primaria. Necesita esta especificidad extra para ganarle a ".inline-form
+   button" de arriba, que por defecto pinta todo botón con el gradiente morado. */
+.inline-form button.button-secondary {
+  background: var(--color-border);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.inline-form button.button-secondary:hover {
+  filter: brightness(0.96);
+}
+
 /* Badges */
 .badge {
   display: inline-block;
