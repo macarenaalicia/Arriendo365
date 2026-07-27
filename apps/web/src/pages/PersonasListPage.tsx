@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import type { Auto, PerfilPersona, Persona, Propiedad, RolUsuario, Usuario } from '../api/types';
+import type {
+  ArriendoPropiedad,
+  Auto,
+  PerfilPersona,
+  Persona,
+  Propiedad,
+  RolUsuario,
+  Usuario,
+} from '../api/types';
 import { ddmmyyyyToIso, isoToDdmmyyyy, sufijoUnidadPropiedad } from '../lib/format';
 import { esRutValido } from '../lib/rut';
 import { DateInput } from '../components/DateInput';
@@ -64,6 +72,7 @@ const ACCESO_FORM_INICIAL = {
 export function PersonasListPage() {
   const { rol, bienesRestringidos } = useAuth();
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [arriendosPropiedad, setArriendosPropiedad] = useState<ArriendoPropiedad[]>([]);
   const [loading, setLoading] = useState(true);
   const tour = useOnboardingTour('personas');
   const [showForm, setShowForm] = useState(false);
@@ -104,6 +113,9 @@ export function PersonasListPage() {
   useEffect(cargar, []);
   useEffect(() => {
     cargarUsuarios();
+  }, []);
+  useEffect(() => {
+    api.get<ArriendoPropiedad[]>('/arriendos-propiedad').then(setArriendosPropiedad);
   }, []);
 
   const cerrarForm = () => {
@@ -314,6 +326,17 @@ export function PersonasListPage() {
     return mostrarInactivos;
   });
 
+  // Si la persona no tiene dirección propia cargada, se muestra la de la
+  // propiedad que arrienda (como arrendatario o codeudor) — mejor que dejar
+  // la columna vacía cuando el dato en realidad existe en el arriendo.
+  const direccionArriendo = (personaId: string): string | null => {
+    const arriendo = arriendosPropiedad.find(
+      (a) => a.arrendatarioId === personaId || a.codeudorId === personaId,
+    );
+    if (!arriendo) return null;
+    return `${arriendo.propiedad.calle} ${arriendo.propiedad.numero}${sufijoUnidadPropiedad(arriendo.propiedad)}`;
+  };
+
   // Personas/Usuarios abarcan a toda la organización: solo el propietario y
   // un administrador sin bienes acotados deben verlos (mismo criterio que
   // Layout oculta el link, esto cubre a quien navegue directo a la URL).
@@ -472,7 +495,7 @@ export function PersonasListPage() {
                   </td>
                   <td>{persona.email ?? ''}</td>
                   <td>{persona.telefono ?? ''}</td>
-                  <td>{persona.direccion ?? ''}</td>
+                  <td>{persona.direccion || direccionArriendo(persona.id) || ''}</td>
                   <td>
                     <div className="table__actions">
                       {!(persona.tipoPersona && PERFILES_SIN_ACCESO.includes(persona.tipoPersona)) && (
