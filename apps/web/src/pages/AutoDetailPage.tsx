@@ -5,11 +5,13 @@ import {
   AUTOPISTAS_TAG,
   PERIODOS_PAGO_AUTO_LABELS,
   SUFIJO_PERIODO_PAGO_AUTO,
+  TIPO_CUENTA_BANCARIA_LABELS,
 } from '../api/types';
 import type {
   ArriendoAuto,
   Auto,
   ConfiguracionMantencion,
+  CuentaBancaria,
   Documento,
   EstadoArriendo,
   EstadoAuto,
@@ -74,6 +76,7 @@ const NUEVA_CONFIG_INICIAL = { tipo: '', cadaKm: '' };
 
 const ARRIENDO_FORM_INICIAL = {
   arrendatarioId: '',
+  cuentaBancariaId: '',
   kilometrajeEntrega: '',
   kilometrajeRecepcion: '',
   periodoPago: 'MENSUAL' as PeriodoPagoAuto,
@@ -146,6 +149,7 @@ export function AutoDetailPage() {
   const [saving, setSaving] = useState(false);
 
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
   const [configuraciones, setConfiguraciones] = useState<ConfiguracionMantencion[]>([]);
 
   const [documentos, setDocumentos] = useState<Documento[]>([]);
@@ -242,6 +246,13 @@ export function AutoDetailPage() {
   useEffect(() => {
     api.get<Persona[]>('/personas').then(setPersonas);
     api.get<ConfiguracionMantencion[]>('/configuraciones-mantencion').then(setConfiguraciones);
+    // Solo propietario/administrador sin bienes acotados pueden listarlas —
+    // para el resto (técnico, administrador acotado) el selector queda sin
+    // opciones, sin que la página se rompa.
+    api
+      .get<CuentaBancaria[]>('/cuentas-bancarias')
+      .then(setCuentasBancarias)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -527,6 +538,7 @@ export function AutoDetailPage() {
     setArriendoError(null);
     setArriendoForm({
       arrendatarioId: arriendo.arrendatarioId,
+      cuentaBancariaId: arriendo.cuentaBancariaId ?? '',
       kilometrajeEntrega: String(arriendo.kilometrajeEntrega),
       kilometrajeRecepcion: arriendo.kilometrajeRecepcion ? String(arriendo.kilometrajeRecepcion) : '',
       periodoPago: arriendo.periodoPago,
@@ -567,6 +579,7 @@ export function AutoDetailPage() {
     if (editingArriendoId) {
       await api.patch(`/arriendos-auto/${editingArriendoId}`, {
         arrendatarioId: arriendoForm.arrendatarioId,
+        cuentaBancariaId: arriendoForm.cuentaBancariaId || null,
         kilometrajeEntrega: Number(arriendoForm.kilometrajeEntrega),
         kilometrajeRecepcion: arriendoForm.kilometrajeRecepcion
           ? Number(arriendoForm.kilometrajeRecepcion)
@@ -581,6 +594,7 @@ export function AutoDetailPage() {
       await api.post('/arriendos-auto', {
         autoId: id,
         arrendatarioId: arriendoForm.arrendatarioId,
+        cuentaBancariaId: arriendoForm.cuentaBancariaId || undefined,
         kilometrajeEntrega: Number(arriendoForm.kilometrajeEntrega),
         periodoPago: arriendoForm.periodoPago,
         fechaEntrega,
@@ -1164,6 +1178,21 @@ export function AutoDetailPage() {
             <p className="empty-state">Sin condiciones registradas.</p>
           )}
         </div>
+
+        {arriendoActivo?.cuentaBancaria && (
+          <div className="detail-card">
+            <h2>Datos para transferencia</h2>
+            <p>{arriendoActivo.cuentaBancaria.banco}</p>
+            <p>
+              {TIPO_CUENTA_BANCARIA_LABELS[arriendoActivo.cuentaBancaria.tipoCuenta]} N°{' '}
+              {arriendoActivo.cuentaBancaria.numero}
+            </p>
+            <p>
+              {arriendoActivo.cuentaBancaria.titular} — {arriendoActivo.cuentaBancaria.rut}
+            </p>
+            {arriendoActivo.cuentaBancaria.email && <p>{arriendoActivo.cuentaBancaria.email}</p>}
+          </div>
+        )}
       </section>
 
       <section>
@@ -1329,6 +1358,22 @@ export function AutoDetailPage() {
                     <option key={p.id} value={p.id}>
                       {p.nombreCompleto}
                       {p.rut ? ` (${p.rut})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Cuenta bancaria (opcional)
+                <select
+                  value={arriendoForm.cuentaBancariaId}
+                  onChange={(e) =>
+                    setArriendoForm({ ...arriendoForm, cuentaBancariaId: e.target.value })
+                  }
+                >
+                  <option value="">Sin asociar</option>
+                  {cuentasBancarias.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.alias} — {c.banco}
                     </option>
                   ))}
                 </select>

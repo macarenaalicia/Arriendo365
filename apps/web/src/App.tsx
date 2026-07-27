@@ -12,6 +12,7 @@ import { PropiedadesListPage } from './pages/PropiedadesListPage';
 import { AutosListPage } from './pages/AutosListPage';
 import { AutoDetailPage } from './pages/AutoDetailPage';
 import { PersonasListPage } from './pages/PersonasListPage';
+import { CuentasBancariasPage } from './pages/CuentasBancariasPage';
 import { RequerimientosPage } from './pages/RequerimientosPage';
 import { RequerimientoDetailPage } from './pages/RequerimientoDetailPage';
 import { PropiedadesPublicasListPage } from './pages/PropiedadesPublicasListPage';
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/autos" element={<AutosListPage />} />
                 <Route path="/autos/:id" element={<AutoDetailPage />} />
                 <Route path="/personas" element={<PersonasListPage />} />
+                <Route path="/cuentas-bancarias" element={<CuentasBancariasPage />} />
               </Route>
             </Route>
           </Route>

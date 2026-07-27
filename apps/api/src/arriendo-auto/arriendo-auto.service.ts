@@ -9,6 +9,7 @@ import { FindArriendosAutoDto } from './dto/find-arriendos-auto.dto';
 const DETALLE_INCLUDE = {
   auto: true,
   arrendatario: true,
+  cuentaBancaria: true,
 } as const;
 
 @Injectable()
@@ -37,6 +38,15 @@ export class ArriendoAutoService {
     }
   }
 
+  private async assertCuentaBancariaEnOrganizacion(cuentaBancariaId: string) {
+    const cuenta = await this.prisma.cuentaBancaria.findFirst({
+      where: { id: cuentaBancariaId, organizacionId: this.tenant.organizacionId },
+    });
+    if (!cuenta) {
+      throw new NotFoundException('Cuenta bancaria no encontrada');
+    }
+  }
+
   private async assertSinArriendoActivo(autoId: string, excluirId?: string) {
     const activo = await this.prisma.arriendoAuto.findFirst({
       where: { autoId, estado: 'ACTIVO', id: excluirId ? { not: excluirId } : undefined },
@@ -59,6 +69,9 @@ export class ArriendoAutoService {
   async create(dto: CreateArriendoAutoDto) {
     await this.assertAutoEnOrganizacion(dto.autoId);
     await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
+    if (dto.cuentaBancariaId) {
+      await this.assertCuentaBancariaEnOrganizacion(dto.cuentaBancariaId);
+    }
     const estadoDestino = dto.estado ?? 'ACTIVO';
     if (estadoDestino === 'ACTIVO') {
       await this.assertSinArriendoActivo(dto.autoId);
@@ -113,6 +126,9 @@ export class ArriendoAutoService {
     }
     if (dto.arrendatarioId) {
       await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
+    }
+    if (dto.cuentaBancariaId) {
+      await this.assertCuentaBancariaEnOrganizacion(dto.cuentaBancariaId);
     }
 
     const estadoDestino = dto.estado ?? actual.estado;

@@ -154,14 +154,14 @@ enum TipoCobroAuto {
 // ---------- TENANT ----------
 
 model Organizacion {
-  id        String             @id @default(uuid())
-  nombre    String
-  plan      String?
-  activo    Boolean            @default(true)
+  id              String             @id @default(uuid())
+  nombre          String
+  plan            String?
+  activo          Boolean            @default(true)
   // Toda organización nueva nace pendiente de aprobación del dueño de la
   // plataforma (SUPER_ADMIN_EMAIL). Las que ya existían al agregar este
   // campo quedan ACTIVA (ver migración) para no bloquear a nadie.
-  estado    EstadoOrganizacion @default(PENDIENTE_APROBACION)
+  estado          EstadoOrganizacion @default(PENDIENTE_APROBACION)
   // Fecha hasta la que la organización puede operar: fin del trial de 7
   // días al aprobarla, o fin del período pagado tras marcar un pago. Si es
   // null, no vence (así quedan las organizaciones ya existentes).
@@ -173,32 +173,62 @@ model Organizacion {
   metodoPago      String?
   ultimoPagoFecha DateTime?
   ultimoPagoMonto Decimal?           @db.Decimal(10, 2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
-  usuarios    Usuario[]
-  personas    Persona[]
-  propiedades Propiedad[]
-  autos       Auto[]
+  usuarios         Usuario[]
+  personas         Persona[]
+  propiedades      Propiedad[]
+  autos            Auto[]
+  cuentasBancarias CuentaBancaria[]
 
   @@map("organizacion")
 }
 
-model Usuario {
-  id             String       @id @default(uuid())
+enum TipoCuentaBancaria {
+  CORRIENTE
+  VISTA
+  AHORRO
+}
+
+// Cuentas del propietario a las que se le puede transferir el arriendo — se
+// cargan una vez y cada arriendo (propiedad o auto) elige a cuál asociarse,
+// para que el arrendatario sepa dónde pagar.
+model CuentaBancaria {
+  id             String             @id @default(uuid())
   organizacionId String
-  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
-  personaId      String
-  persona        Persona      @relation(fields: [personaId], references: [id])
-  rol            RolUsuario
-  passwordHash   String
+  organizacion   Organizacion       @relation(fields: [organizacionId], references: [id])
+  alias          String
+  banco          String
+  tipoCuenta     TipoCuentaBancaria
+  numero         String
+  titular        String
+  rut            String
+  email          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  arriendosPropiedad ArriendoPropiedad[]
+  arriendosAuto      ArriendoAuto[]
+
+  @@map("cuenta_bancaria")
+}
+
+model Usuario {
+  id                  String       @id @default(uuid())
+  organizacionId      String
+  organizacion        Organizacion @relation(fields: [organizacionId], references: [id])
+  personaId           String
+  persona             Persona      @relation(fields: [personaId], references: [id])
+  rol                 RolUsuario
+  passwordHash        String
   // true cuando la contraseña fue asignada por un tercero (creación con
   // clave inicial "1234" o reseteo por un administrador) y la persona aún
   // no la cambia por una propia — se le exige cambiarla al iniciar sesión.
-  debeCambiarPassword Boolean @default(false)
-  activo         Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  debeCambiarPassword Boolean      @default(false)
+  activo              Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   actualizacionesRequerimiento RequerimientoActualizacion[]
   bienesAdministrados          AdministradorBien[]
@@ -209,9 +239,9 @@ model Usuario {
 // ---------- PERSONA (entidad transversal) ----------
 
 model Persona {
-  id                    String       @id @default(uuid())
+  id                    String         @id @default(uuid())
   organizacionId        String
-  organizacion          Organizacion @relation(fields: [organizacionId], references: [id])
+  organizacion          Organizacion   @relation(fields: [organizacionId], references: [id])
   nombreCompleto        String
   // Un técnico (tipoPersona TECNICO) solo exige nombre completo: no se le
   // pide RUT ni el resto de los datos legales que sí necesita un
@@ -232,8 +262,8 @@ model Persona {
   licenciaFrontalFotoId String?
   licenciaTraseraFotoId String?
   contratoTrabajoDocId  String?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
   recomendaciones         PersonaRecomendacion[]
   usuarios                Usuario[]
@@ -362,13 +392,13 @@ model Proveedor {
 // ---------- ARRIENDO DE PROPIEDAD (entidad raíz del sistema) ----------
 
 model ArriendoPropiedad {
-  id                      String         @id @default(uuid())
+  id                      String          @id @default(uuid())
   propiedadId             String
-  propiedad               Propiedad      @relation(fields: [propiedadId], references: [id])
+  propiedad               Propiedad       @relation(fields: [propiedadId], references: [id])
   arrendatarioId          String
-  arrendatario            Persona        @relation("ArrendatarioPropiedad", fields: [arrendatarioId], references: [id])
+  arrendatario            Persona         @relation("ArrendatarioPropiedad", fields: [arrendatarioId], references: [id])
   codeudorId              String?
-  codeudor                Persona?       @relation("CodeudorPropiedad", fields: [codeudorId], references: [id])
+  codeudor                Persona?        @relation("CodeudorPropiedad", fields: [codeudorId], references: [id])
   fechaPago               Int
   fechaEntrega            DateTime
   fechaRecepcion          DateTime?
@@ -376,20 +406,22 @@ model ArriendoPropiedad {
   // % de IPC pactado a aplicar sobre montoArriendo cada vez que se cumple
   // periodoAlza desde ultimaAlzaFecha (o fechaEntrega si nunca se ha
   // aplicado un reajuste).
-  ipcPorcentaje           Decimal?       @db.Decimal(5, 2)
+  ipcPorcentaje           Decimal?        @db.Decimal(5, 2)
   ultimaAlzaFecha         DateTime?
-  garantia                Boolean        @default(false)
-  garantiaMontoPactado    Decimal?       @db.Decimal(10, 2)
-  garantiaMontoPagado     Decimal?       @db.Decimal(10, 2)
+  garantia                Boolean         @default(false)
+  garantiaMontoPactado    Decimal?        @db.Decimal(10, 2)
+  garantiaMontoPagado     Decimal?        @db.Decimal(10, 2)
   garantiaFechaDevolucion DateTime?
-  garantiaMontoDevuelto   Decimal?       @db.Decimal(10, 2)
+  garantiaMontoDevuelto   Decimal?        @db.Decimal(10, 2)
   garantiaMotivoRetencion String?
-  montoArriendo           Decimal        @db.Decimal(10, 2)
+  montoArriendo           Decimal         @db.Decimal(10, 2)
   actaEntregaDetalle      String?
   actaRecepcionDetalle    String?
-  estado                  EstadoArriendo @default(ACTIVO)
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
+  estado                  EstadoArriendo  @default(ACTIVO)
+  cuentaBancariaId        String?
+  cuentaBancaria          CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
 
   inventario     ArriendoInventario[]
   requerimientos Requerimiento[]
@@ -443,13 +475,13 @@ model Pago {
 // ---------- REQUERIMIENTOS ----------
 
 model Requerimiento {
-  id                  String                @id @default(uuid())
+  id                  String                    @id @default(uuid())
   arriendoPropiedadId String
-  arriendoPropiedad   ArriendoPropiedad     @relation(fields: [arriendoPropiedadId], references: [id])
+  arriendoPropiedad   ArriendoPropiedad         @relation(fields: [arriendoPropiedadId], references: [id])
   urgencia            UrgenciaRequerimiento
-  estado              EstadoRequerimiento   @default(PENDIENTE_REVISION)
+  estado              EstadoRequerimiento       @default(PENDIENTE_REVISION)
   tecnicoId           String?
-  tecnico             Persona?              @relation(fields: [tecnicoId], references: [id])
+  tecnico             Persona?                  @relation(fields: [tecnicoId], references: [id])
   calificacionId      String
   calificacion        CalificacionRequerimiento @relation(fields: [calificacionId], references: [id])
   detalleResolucion   String?
@@ -458,11 +490,11 @@ model Requerimiento {
   // Visibles solo para propietario/administrador.
   inspeccion          String?
   detalleGasto        String?
-  totalGasto          Decimal?              @db.Decimal(10, 2)
+  totalGasto          Decimal?                  @db.Decimal(10, 2)
   fechaComprometida   DateTime?
   fechaSolucion       DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
 
   presupuestos    RequerimientoPresupuesto[]
   gastos          Gasto[]
@@ -487,21 +519,21 @@ model CalificacionRequerimiento {
 // (no una descripción del cambio), para poder comparar a la vista la fila
 // vigente contra sus versiones previas usando las mismas columnas.
 model RequerimientoActualizacion {
-  id                String                @id @default(uuid())
+  id                String                    @id @default(uuid())
   requerimientoId   String
-  requerimiento     Requerimiento         @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
+  requerimiento     Requerimiento             @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
   urgencia          UrgenciaRequerimiento
   estado            EstadoRequerimiento
   calificacionId    String
   calificacion      CalificacionRequerimiento @relation(fields: [calificacionId], references: [id])
   tecnicoId         String?
-  tecnico           Persona?              @relation(fields: [tecnicoId], references: [id])
+  tecnico           Persona?                  @relation(fields: [tecnicoId], references: [id])
   notasArrendatario String?
   detalleResolucion String?
   nota              String?
   usuarioId         String?
-  usuario           Usuario?              @relation(fields: [usuarioId], references: [id])
-  createdAt         DateTime              @default(now())
+  usuario           Usuario?                  @relation(fields: [usuarioId], references: [id])
+  createdAt         DateTime                  @default(now())
 
   @@map("requerimiento_actualizacion")
 }
@@ -627,11 +659,11 @@ model MantencionAutoItem {
 }
 
 model ArriendoAuto {
-  id                   String         @id @default(uuid())
+  id                   String          @id @default(uuid())
   autoId               String
-  auto                 Auto           @relation(fields: [autoId], references: [id])
+  auto                 Auto            @relation(fields: [autoId], references: [id])
   arrendatarioId       String
-  arrendatario         Persona        @relation(fields: [arrendatarioId], references: [id])
+  arrendatario         Persona         @relation(fields: [arrendatarioId], references: [id])
   kilometrajeEntrega   Int
   kilometrajeRecepcion Int?
   contratoDocId        String?
@@ -640,10 +672,12 @@ model ArriendoAuto {
   periodoPago          PeriodoPagoAuto @default(MENSUAL)
   fechaEntrega         DateTime
   periodoAlza          String
-  montoArriendo        Decimal        @db.Decimal(10, 2)
-  estado               EstadoArriendo @default(ACTIVO)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  montoArriendo        Decimal         @db.Decimal(10, 2)
+  estado               EstadoArriendo  @default(ACTIVO)
+  cuentaBancariaId     String?
+  cuentaBancaria       CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   @@map("arriendo_auto")
 }
@@ -669,7 +703,7 @@ model PagoVehiculo {
   pagado            Boolean          @default(false)
   // Cuánto se le ha abonado a esta boleta hasta ahora — un abono puede ser
   // parcial y no cubrirla completa (queda con saldo = monto - montoPagado).
-  montoPagado        Decimal         @default(0) @db.Decimal(10, 2)
+  montoPagado       Decimal          @default(0) @db.Decimal(10, 2)
   // true solo en la fila que representa el abono en sí (no una boleta),
   // generada automáticamente al registrar un abono.
   esAbono           Boolean          @default(false)

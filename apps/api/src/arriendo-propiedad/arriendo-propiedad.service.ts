@@ -13,6 +13,7 @@ const DETALLE_INCLUDE = {
   propiedad: true,
   arrendatario: true,
   codeudor: true,
+  cuentaBancaria: true,
 } as const;
 
 // Meses que representa cada valor de periodoAlza (campo de texto libre en
@@ -82,6 +83,15 @@ export class ArriendoPropiedadService {
     }
   }
 
+  private async assertCuentaBancariaEnOrganizacion(cuentaBancariaId: string) {
+    const cuenta = await this.prisma.cuentaBancaria.findFirst({
+      where: { id: cuentaBancariaId, organizacionId: this.tenant.organizacionId },
+    });
+    if (!cuenta) {
+      throw new NotFoundException('Cuenta bancaria no encontrada');
+    }
+  }
+
   private async assertSinArriendoActivo(propiedadId: string, excluirId?: string) {
     const activo = await this.prisma.arriendoPropiedad.findFirst({
       where: { propiedadId, estado: 'ACTIVO', id: excluirId ? { not: excluirId } : undefined },
@@ -119,6 +129,9 @@ export class ArriendoPropiedadService {
     await this.assertPersonaEnOrganizacion(dto.arrendatarioId);
     if (dto.codeudorId) {
       await this.assertPersonaEnOrganizacion(dto.codeudorId);
+    }
+    if (dto.cuentaBancariaId) {
+      await this.assertCuentaBancariaEnOrganizacion(dto.cuentaBancariaId);
     }
     const estadoDestino = dto.estado ?? 'ACTIVO';
     if (estadoDestino === 'ACTIVO') {
@@ -201,6 +214,9 @@ export class ArriendoPropiedadService {
     }
     if (dto.codeudorId) {
       await this.assertPersonaEnOrganizacion(dto.codeudorId);
+    }
+    if (dto.cuentaBancariaId) {
+      await this.assertCuentaBancariaEnOrganizacion(dto.cuentaBancariaId);
     }
 
     const estadoDestino = dto.estado ?? actual.estado;

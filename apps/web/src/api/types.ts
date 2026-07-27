@@ -214,6 +214,25 @@ export const SUFIJO_PERIODO_PAGO_AUTO: Record<PeriodoPagoAuto, string> = {
   MENSUAL: '/mes',
 };
 
+export type TipoCuentaBancaria = 'CORRIENTE' | 'VISTA' | 'AHORRO';
+
+export const TIPO_CUENTA_BANCARIA_LABELS: Record<TipoCuentaBancaria, string> = {
+  CORRIENTE: 'Cuenta corriente',
+  VISTA: 'Cuenta vista',
+  AHORRO: 'Cuenta de ahorro',
+};
+
+export interface CuentaBancaria {
+  id: string;
+  alias: string;
+  banco: string;
+  tipoCuenta: TipoCuentaBancaria;
+  numero: string;
+  titular: string;
+  rut: string;
+  email: string | null;
+}
+
 export interface ArriendoAuto {
   id: string;
   autoId: string;
@@ -228,6 +247,8 @@ export interface ArriendoAuto {
   estado: EstadoArriendo;
   arrendatario: Persona;
   auto: Auto;
+  cuentaBancariaId: string | null;
+  cuentaBancaria: CuentaBancaria | null;
 }
 
 export interface ArriendoPropiedad {
@@ -250,6 +271,8 @@ export interface ArriendoPropiedad {
   propiedad: Propiedad;
   arrendatario: Persona;
   codeudor: Persona | null;
+  cuentaBancariaId: string | null;
+  cuentaBancaria: CuentaBancaria | null;
   /** Solo viene informado para el arrendatario que consulta su propio arriendo. */
   arrendador?: Persona | null;
 }

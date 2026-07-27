@@ -88,6 +88,11 @@ export function Layout() {
                 <Link to="/perfil" onClick={() => setMenuAbierto(false)}>
                   Perfil
                 </Link>
+                {puedeVerPersonas && (
+                  <Link to="/cuentas-bancarias" onClick={() => setMenuAbierto(false)}>
+                    Cuentas bancarias
+                  </Link>
+                )}
                 <Link to="/configuracion" onClick={() => setMenuAbierto(false)}>
                   Configuración
                 </Link>

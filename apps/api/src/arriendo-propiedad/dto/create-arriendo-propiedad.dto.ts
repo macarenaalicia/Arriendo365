@@ -90,4 +90,8 @@ export class CreateArriendoPropiedadDto {
   @IsOptional()
   @IsEnum(EstadoArriendo)
   estado?: EstadoArriendo;
+
+  @IsOptional()
+  @IsUUID()
+  cuentaBancariaId?: string;
 }

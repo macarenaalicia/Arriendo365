@@ -50,4 +50,8 @@ export class CreateArriendoAutoDto {
   @IsOptional()
   @IsEnum(EstadoArriendo)
   estado?: EstadoArriendo;
+
+  @IsOptional()
+  @IsUUID()
+  cuentaBancariaId?: string;
 }

@@ -27,6 +27,7 @@ import { PublicPropiedadesModule } from './public-propiedades/public-propiedades
 import { PerfilModule } from './perfil/perfil.module';
 import { AdministradorBienModule } from './administrador-bien/administrador-bien.module';
 import { CalificacionRequerimientoModule } from './calificacion-requerimiento/calificacion-requerimiento.module';
+import { CuentaBancariaModule } from './cuenta-bancaria/cuenta-bancaria.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { CalificacionRequerimientoModule } from './calificacion-requerimiento/ca
     PerfilModule,
     AdministradorBienModule,
     CalificacionRequerimientoModule,
+    CuentaBancariaModule,
   ],
   controllers: [AppController],
   providers: [

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import type {
   ArriendoPropiedad,
   CategoriaPago,
+  CuentaBancaria,
   Documento,
   EstadoArriendo,
   EstadoPago,
@@ -15,6 +16,7 @@ import type {
   TipoProveedor,
   UrgenciaRequerimiento,
 } from '../api/types';
+import { TIPO_CUENTA_BANCARIA_LABELS } from '../api/types';
 import {
   ddmmyyyyToIso,
   formatFecha,
@@ -97,6 +99,7 @@ const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
 const CONDICIONES_FORM_INICIAL = {
   arrendatarioId: '',
   codeudorId: '',
+  cuentaBancariaId: '',
   montoArriendo: '',
   fechaPago: '',
   fechaEntrega: '',
@@ -163,6 +166,7 @@ export function ArriendoDetailPage() {
 
   const [requerimientos, setRequerimientos] = useState<Requerimiento[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
   const { calificaciones, recargarCalificaciones } = useCalificaciones();
   const [showReqForm, setShowReqForm] = useState(false);
   const [editingReqId, setEditingReqId] = useState<string | null>(null);
@@ -303,6 +307,7 @@ export function ArriendoDetailPage() {
     setCondicionesForm({
       arrendatarioId: arriendo.arrendatarioId,
       codeudorId: arriendo.codeudorId ?? '',
+      cuentaBancariaId: arriendo.cuentaBancariaId ?? '',
       montoArriendo: arriendo.montoArriendo,
       fechaPago: String(arriendo.fechaPago),
       fechaEntrega: isoToDdmmyyyy(arriendo.fechaEntrega),
@@ -336,6 +341,7 @@ export function ArriendoDetailPage() {
       await api.patch(`/arriendos-propiedad/${id}`, {
         arrendatarioId: condicionesForm.arrendatarioId,
         codeudorId: condicionesForm.codeudorId || null,
+        cuentaBancariaId: condicionesForm.cuentaBancariaId || null,
         montoArriendo: Number(condicionesForm.montoArriendo),
         fechaPago: Number(condicionesForm.fechaPago),
         fechaEntrega,
@@ -395,8 +401,11 @@ export function ArriendoDetailPage() {
       api.get<Persona[]>('/personas').then(setPersonas);
       cargarDocumentos();
     }
+    if (esPropietarioOAdmin) {
+      api.get<CuentaBancaria[]>('/cuentas-bancarias').then(setCuentasBancarias);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [esStaff, id]);
+  }, [esStaff, esPropietarioOAdmin, id]);
 
   const cerrarPagoForm = () => {
     setShowPagoForm(false);
@@ -866,6 +875,21 @@ export function ArriendoDetailPage() {
             </div>
           )}
         </div>
+
+        {arriendo.cuentaBancaria && (
+          <div className="detail-card">
+            <h2>Datos para transferencia</h2>
+            <p>{arriendo.cuentaBancaria.banco}</p>
+            <p>
+              {TIPO_CUENTA_BANCARIA_LABELS[arriendo.cuentaBancaria.tipoCuenta]} N°{' '}
+              {arriendo.cuentaBancaria.numero}
+            </p>
+            <p>
+              {arriendo.cuentaBancaria.titular} — {arriendo.cuentaBancaria.rut}
+            </p>
+            {arriendo.cuentaBancaria.email && <p>{arriendo.cuentaBancaria.email}</p>}
+          </div>
+        )}
       </section>
 
       {showCondicionesForm && (
@@ -911,6 +935,24 @@ export function ArriendoDetailPage() {
                     ))}
                 </select>
               </label>
+              {esPropietarioOAdmin && (
+                <label>
+                  Cuenta bancaria (opcional)
+                  <select
+                    value={condicionesForm.cuentaBancariaId}
+                    onChange={(e) =>
+                      setCondicionesForm({ ...condicionesForm, cuentaBancariaId: e.target.value })
+                    }
+                  >
+                    <option value="">Sin asociar</option>
+                    {cuentasBancarias.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.alias} — {c.banco}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label>
                 Monto arriendo
                 <input
