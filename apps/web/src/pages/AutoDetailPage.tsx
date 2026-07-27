@@ -76,7 +76,7 @@ const NUEVA_CONFIG_INICIAL = { tipo: '', cadaKm: '' };
 
 const ARRIENDO_FORM_INICIAL = {
   arrendatarioId: '',
-  cuentaBancariaId: '',
+  medioPago: '',
   kilometrajeEntrega: '',
   kilometrajeRecepcion: '',
   periodoPago: 'MENSUAL' as PeriodoPagoAuto,
@@ -538,7 +538,7 @@ export function AutoDetailPage() {
     setArriendoError(null);
     setArriendoForm({
       arrendatarioId: arriendo.arrendatarioId,
-      cuentaBancariaId: arriendo.cuentaBancariaId ?? '',
+      medioPago: arriendo.pagaEnEfectivo ? 'EFECTIVO' : (arriendo.cuentaBancariaId ?? ''),
       kilometrajeEntrega: String(arriendo.kilometrajeEntrega),
       kilometrajeRecepcion: arriendo.kilometrajeRecepcion ? String(arriendo.kilometrajeRecepcion) : '',
       periodoPago: arriendo.periodoPago,
@@ -579,7 +579,11 @@ export function AutoDetailPage() {
     if (editingArriendoId) {
       await api.patch(`/arriendos-auto/${editingArriendoId}`, {
         arrendatarioId: arriendoForm.arrendatarioId,
-        cuentaBancariaId: arriendoForm.cuentaBancariaId || null,
+        cuentaBancariaId:
+          arriendoForm.medioPago && arriendoForm.medioPago !== 'EFECTIVO'
+            ? arriendoForm.medioPago
+            : null,
+        pagaEnEfectivo: arriendoForm.medioPago === 'EFECTIVO',
         kilometrajeEntrega: Number(arriendoForm.kilometrajeEntrega),
         kilometrajeRecepcion: arriendoForm.kilometrajeRecepcion
           ? Number(arriendoForm.kilometrajeRecepcion)
@@ -594,7 +598,11 @@ export function AutoDetailPage() {
       await api.post('/arriendos-auto', {
         autoId: id,
         arrendatarioId: arriendoForm.arrendatarioId,
-        cuentaBancariaId: arriendoForm.cuentaBancariaId || undefined,
+        cuentaBancariaId:
+          arriendoForm.medioPago && arriendoForm.medioPago !== 'EFECTIVO'
+            ? arriendoForm.medioPago
+            : undefined,
+        pagaEnEfectivo: arriendoForm.medioPago === 'EFECTIVO',
         kilometrajeEntrega: Number(arriendoForm.kilometrajeEntrega),
         periodoPago: arriendoForm.periodoPago,
         fechaEntrega,
@@ -1179,6 +1187,13 @@ export function AutoDetailPage() {
           )}
         </div>
 
+        {arriendoActivo?.pagaEnEfectivo && (
+          <div className="detail-card">
+            <h2>Medio de pago</h2>
+            <p>Efectivo</p>
+          </div>
+        )}
+
         {arriendoActivo?.cuentaBancaria && (
           <div className="detail-card">
             <h2>Datos para transferencia</h2>
@@ -1363,14 +1378,13 @@ export function AutoDetailPage() {
                 </select>
               </label>
               <label>
-                Cuenta bancaria (opcional)
+                Medio de pago (opcional)
                 <select
-                  value={arriendoForm.cuentaBancariaId}
-                  onChange={(e) =>
-                    setArriendoForm({ ...arriendoForm, cuentaBancariaId: e.target.value })
-                  }
+                  value={arriendoForm.medioPago}
+                  onChange={(e) => setArriendoForm({ ...arriendoForm, medioPago: e.target.value })}
                 >
-                  <option value="">Sin asociar</option>
+                  <option value="">Sin especificar</option>
+                  <option value="EFECTIVO">Efectivo</option>
                   {cuentasBancarias.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.alias} — {c.banco}

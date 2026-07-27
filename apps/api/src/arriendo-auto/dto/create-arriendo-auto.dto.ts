@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDate,
   IsEnum,
   IsInt,
@@ -54,4 +55,8 @@ export class CreateArriendoAutoDto {
   @IsOptional()
   @IsUUID()
   cuentaBancariaId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  pagaEnEfectivo?: boolean;
 }

@@ -94,4 +94,8 @@ export class CreateArriendoPropiedadDto {
   @IsOptional()
   @IsUUID()
   cuentaBancariaId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  pagaEnEfectivo?: boolean;
 }

@@ -77,7 +77,10 @@ export class ArriendoAutoService {
       await this.assertSinArriendoActivo(dto.autoId);
     }
 
-    const arriendo = await this.prisma.arriendoAuto.create({ data: dto, include: DETALLE_INCLUDE });
+    const arriendo = await this.prisma.arriendoAuto.create({
+      data: { ...dto, cuentaBancariaId: dto.pagaEnEfectivo ? undefined : dto.cuentaBancariaId },
+      include: DETALLE_INCLUDE,
+    });
     await this.sincronizarEstadoAuto(dto.autoId, estadoDestino);
     return arriendo;
   }
@@ -138,7 +141,7 @@ export class ArriendoAutoService {
 
     const actualizado = await this.prisma.arriendoAuto.update({
       where: { id },
-      data: dto,
+      data: { ...dto, cuentaBancariaId: dto.pagaEnEfectivo ? null : dto.cuentaBancariaId },
       include: DETALLE_INCLUDE,
     });
 

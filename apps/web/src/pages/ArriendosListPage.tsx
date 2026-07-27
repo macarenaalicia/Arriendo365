@@ -603,8 +603,8 @@ export function ArriendosListPage() {
                 <tr>
                   <th>Patente</th>
                   {esStaff && <th>Arrendatario</th>}
-                  <th>Estado</th>
                   <th>Monto</th>
+                  <th>Medio pago</th>
                   <th>Kilometraje de entrega</th>
                   <th>Kilometraje actual</th>
                   {esStaff && <th>Reajuste</th>}
@@ -626,13 +626,13 @@ export function ArriendosListPage() {
                       <td>{arriendoAuto.auto.patente}</td>
                       {esStaff && <td>{arriendoAuto.arrendatario.nombreCompleto}</td>}
                       <td>
-                        <span className={`badge badge--${arriendoAuto.estado.toLowerCase()}`}>
-                          {arriendoAuto.estado}
-                        </span>
-                      </td>
-                      <td>
                         {formatMonto(arriendoAuto.montoArriendo)}
                         {SUFIJO_PERIODO_PAGO_AUTO[arriendoAuto.periodoPago]}
+                      </td>
+                      <td>
+                        {arriendoAuto.pagaEnEfectivo
+                          ? 'Efectivo'
+                          : (arriendoAuto.cuentaBancaria?.alias ?? '—')}
                       </td>
                       <td>{arriendoAuto.kilometrajeEntrega.toLocaleString('es-CL')} km</td>
                       <td>{arriendoAuto.auto.kilometraje.toLocaleString('es-CL')} km</td>
@@ -696,8 +696,8 @@ export function ArriendosListPage() {
             <tr>
               <th>Propiedad</th>
               <th>Arrendatario</th>
-              <th>Estado</th>
               <th>Monto</th>
+              <th>Medio pago</th>
               {esStaff && <th>Arriendo</th>}
               {esStaff && <th>Servicios básicos</th>}
               {esStaff && <th>Requerimientos</th>}
@@ -735,12 +735,12 @@ export function ArriendosListPage() {
                     </Link>
                   </td>
                   <td>{arriendo.arrendatario.nombreCompleto}</td>
-                  <td>
-                    <span className={`badge badge--${arriendo.estado.toLowerCase()}`}>
-                      {arriendo.estado}
-                    </span>
-                  </td>
                   <td>{formatMonto(arriendo.montoArriendo)}/mes</td>
+                  <td>
+                    {arriendo.pagaEnEfectivo
+                      ? 'Efectivo'
+                      : (arriendo.cuentaBancaria?.alias ?? '—')}
+                  </td>
                   {esStaff && (
                     <td>
                       <Link to={`/arriendos/${arriendo.id}#pagos-arriendo`}>

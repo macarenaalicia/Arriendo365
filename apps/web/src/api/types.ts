@@ -249,6 +249,7 @@ export interface ArriendoAuto {
   auto: Auto;
   cuentaBancariaId: string | null;
   cuentaBancaria: CuentaBancaria | null;
+  pagaEnEfectivo: boolean;
 }
 
 export interface ArriendoPropiedad {
@@ -273,6 +274,7 @@ export interface ArriendoPropiedad {
   codeudor: Persona | null;
   cuentaBancariaId: string | null;
   cuentaBancaria: CuentaBancaria | null;
+  pagaEnEfectivo: boolean;
   /** Solo viene informado para el arrendatario que consulta su propio arriendo. */
   arrendador?: Persona | null;
 }

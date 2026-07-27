@@ -139,7 +139,7 @@ export class ArriendoPropiedadService {
     }
 
     const arriendo = await this.prisma.arriendoPropiedad.create({
-      data: dto,
+      data: { ...dto, cuentaBancariaId: dto.pagaEnEfectivo ? undefined : dto.cuentaBancariaId },
       include: DETALLE_INCLUDE,
     });
     await this.sincronizarEstadoPropiedad(dto.propiedadId, estadoDestino);
@@ -226,7 +226,7 @@ export class ArriendoPropiedadService {
 
     const actualizado = await this.prisma.arriendoPropiedad.update({
       where: { id },
-      data: dto,
+      data: { ...dto, cuentaBancariaId: dto.pagaEnEfectivo ? null : dto.cuentaBancariaId },
       include: DETALLE_INCLUDE,
     });
 

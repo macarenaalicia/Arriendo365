@@ -99,7 +99,7 @@ const ESTADOS_ARRIENDO: EstadoArriendo[] = ['ACTIVO', 'INACTIVO', 'TERMINADO'];
 const CONDICIONES_FORM_INICIAL = {
   arrendatarioId: '',
   codeudorId: '',
-  cuentaBancariaId: '',
+  medioPago: '',
   montoArriendo: '',
   fechaPago: '',
   fechaEntrega: '',
@@ -307,7 +307,7 @@ export function ArriendoDetailPage() {
     setCondicionesForm({
       arrendatarioId: arriendo.arrendatarioId,
       codeudorId: arriendo.codeudorId ?? '',
-      cuentaBancariaId: arriendo.cuentaBancariaId ?? '',
+      medioPago: arriendo.pagaEnEfectivo ? 'EFECTIVO' : (arriendo.cuentaBancariaId ?? ''),
       montoArriendo: arriendo.montoArriendo,
       fechaPago: String(arriendo.fechaPago),
       fechaEntrega: isoToDdmmyyyy(arriendo.fechaEntrega),
@@ -341,7 +341,11 @@ export function ArriendoDetailPage() {
       await api.patch(`/arriendos-propiedad/${id}`, {
         arrendatarioId: condicionesForm.arrendatarioId,
         codeudorId: condicionesForm.codeudorId || null,
-        cuentaBancariaId: condicionesForm.cuentaBancariaId || null,
+        cuentaBancariaId:
+          condicionesForm.medioPago && condicionesForm.medioPago !== 'EFECTIVO'
+            ? condicionesForm.medioPago
+            : null,
+        pagaEnEfectivo: condicionesForm.medioPago === 'EFECTIVO',
         montoArriendo: Number(condicionesForm.montoArriendo),
         fechaPago: Number(condicionesForm.fechaPago),
         fechaEntrega,
@@ -876,6 +880,13 @@ export function ArriendoDetailPage() {
           )}
         </div>
 
+        {arriendo.pagaEnEfectivo && (
+          <div className="detail-card">
+            <h2>Medio de pago</h2>
+            <p>Efectivo</p>
+          </div>
+        )}
+
         {arriendo.cuentaBancaria && (
           <div className="detail-card">
             <h2>Datos para transferencia</h2>
@@ -937,14 +948,15 @@ export function ArriendoDetailPage() {
               </label>
               {esPropietarioOAdmin && (
                 <label>
-                  Cuenta bancaria (opcional)
+                  Medio de pago (opcional)
                   <select
-                    value={condicionesForm.cuentaBancariaId}
+                    value={condicionesForm.medioPago}
                     onChange={(e) =>
-                      setCondicionesForm({ ...condicionesForm, cuentaBancariaId: e.target.value })
+                      setCondicionesForm({ ...condicionesForm, medioPago: e.target.value })
                     }
                   >
-                    <option value="">Sin asociar</option>
+                    <option value="">Sin especificar</option>
+                    <option value="EFECTIVO">Efectivo</option>
                     {cuentasBancarias.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.alias} — {c.banco}

@@ -420,6 +420,9 @@ model ArriendoPropiedad {
   estado                  EstadoArriendo  @default(ACTIVO)
   cuentaBancariaId        String?
   cuentaBancaria          CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  // Mutuamente excluyente con cuentaBancariaId: si paga en efectivo no hay
+  // datos de transferencia que mostrar.
+  pagaEnEfectivo          Boolean         @default(false)
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
 
@@ -676,6 +679,7 @@ model ArriendoAuto {
   estado               EstadoArriendo  @default(ACTIVO)
   cuentaBancariaId     String?
   cuentaBancaria       CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  pagaEnEfectivo       Boolean         @default(false)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
